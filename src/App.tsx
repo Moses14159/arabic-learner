@@ -46,9 +46,10 @@ export default function App() {
   const [book, setBook] = useStored<MistakeBook>('qalam.mistakes', {})
   const [sessions, setSessions] = useStoredList<SessionRecord>('qalam.sessions')
   const [lessonScores, setLessonScores] = useStored<Record<string, number>>('qalam.lessons', {})
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+  const [theme, setTheme] = useState<'night' | 'light' | 'emerald'>(() => {
     const saved = localStorage.getItem('qalam.theme')
-    return saved === 'light' ? 'light' : 'dark'
+    if (saved === 'light' || saved === 'emerald' || saved === 'night') return saved
+    return 'night'
   })
 
   useEffect(() => {
@@ -127,18 +128,47 @@ export default function App() {
           ))}
         </nav>
 
-        <button
-          id="btn-theme-toggle"
-          className="icon-btn"
-          aria-label={theme === 'dark' ? '切换为羊皮纸浅色主题' : '切换为墨绿深色主题'}
-          title={theme === 'dark' ? '切换为浅色主题' : '切换为深色主题'}
-          onClick={(e) => {
-            setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
-            e.currentTarget.blur()
-          }}
-        >
-          {theme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
-        </button>
+        <div className="theme-switcher" role="group" aria-label="配色主题切换">
+          <button
+            id="btn-theme-night"
+            className={'theme-pill' + (theme === 'night' ? ' is-on' : '')}
+            title="星夜蓝金 · Arabian Nights"
+            aria-label="切换为星夜蓝金配色"
+            onClick={(e) => {
+              setTheme('night')
+              e.currentTarget.blur()
+            }}
+          >
+            <IconMoon size={14} />
+            <span>星夜</span>
+          </button>
+          <button
+            id="btn-theme-light"
+            className={'theme-pill' + (theme === 'light' ? ' is-on' : '')}
+            title="羊皮纸墨香 · Andalusian Daylight"
+            aria-label="切换为羊皮纸浅色配色"
+            onClick={(e) => {
+              setTheme('light')
+              e.currentTarget.blur()
+            }}
+          >
+            <IconSun size={14} />
+            <span>浅色</span>
+          </button>
+          <button
+            id="btn-theme-emerald"
+            className={'theme-pill' + (theme === 'emerald' ? ' is-on' : '')}
+            title="翡翠流金 · Oasis Emerald"
+            aria-label="切换为翡翠流金配色"
+            onClick={(e) => {
+              setTheme('emerald')
+              e.currentTarget.blur()
+            }}
+          >
+            <IconSparkles size={14} />
+            <span>翡翠</span>
+          </button>
+        </div>
       </header>
 
       <main className="main">
