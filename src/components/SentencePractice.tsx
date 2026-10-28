@@ -6,6 +6,16 @@ import { charsFromEvent, KEY_FOR_CHAR, MARK_NAMES } from '../lib/keyboard'
 import { sfx, speak } from '../lib/audio'
 import type { Settings } from '../lib/storage'
 import { Keyboard } from './Keyboard'
+import {
+  IconArrowLeft,
+  IconArrowRight,
+  IconEye,
+  IconKeyboard,
+  IconPuzzle,
+  IconRefresh,
+  IconTrophy,
+  IconVolume,
+} from './Icons'
 
 interface Props {
   title: string
@@ -225,12 +235,20 @@ export function SentencePractice({ title, sentences, settings, setSettings, onCo
     return (
       <section className="practice">
         <div className="result glass">
-          <div className="result__badge">🎓</div>
+          <div className="result__badge">
+            <IconTrophy size={42} />
+          </div>
           <h2>造句通关：{title}</h2>
           <p className="muted">مُمْتَاز！你已完成本课全部句法造句与解剖训练。</p>
           <div className="result__stats">
-            <div><b>{sentences.length}</b><span>完成句子</span></div>
-            <div><b>{acc}%</b><span>造句正确率</span></div>
+            <div>
+              <b>{sentences.length}</b>
+              <span>完成句子</span>
+            </div>
+            <div>
+              <b>{acc}%</b>
+              <span>造句正确率</span>
+            </div>
           </div>
           <div className="result__actions">
             <button
@@ -241,9 +259,11 @@ export function SentencePractice({ title, sentences, settings, setSettings, onCo
                 resetSentenceState()
               }}
             >
-              再练一遍
+              <IconRefresh size={16} /> 再练一遍
             </button>
-            <button className="btn btn--gold" onClick={onBack}>返回课程主页</button>
+            <button className="btn btn--gold" onClick={onBack}>
+              返回课程主页 <IconArrowRight size={16} />
+            </button>
           </div>
         </div>
       </section>
@@ -259,37 +279,49 @@ export function SentencePractice({ title, sentences, settings, setSettings, onCo
   return (
     <section className="practice">
       <div className="practice__top">
-        <button className="btn btn--ghost btn--sm" onClick={onBack}>← 返回本课</button>
-        <h2 className="practice__title">{title} · 句法工坊 ({idx + 1}/{sentences.length})</h2>
-        <div className="seg">
+        <button className="btn btn--ghost btn--sm" onClick={onBack}>
+          <IconArrowLeft size={16} /> 返回本课
+        </button>
+        <h2 className="practice__title">
+          {title} · 句法工坊 ({idx + 1}/{sentences.length})
+        </h2>
+        <div className="seg" role="tablist" aria-label="造句练习模式">
           <button
+            role="tab"
+            aria-selected={mode === 'build'}
             className={mode === 'build' ? 'on' : ''}
             onClick={() => {
               setMode('build')
               resetSentenceState()
             }}
           >
-            🧩 词块连词成句
+            <IconPuzzle size={15} /> 词块连词成句
           </button>
           <button
+            role="tab"
+            aria-selected={mode === 'type'}
             className={mode === 'type' ? 'on' : ''}
             onClick={() => {
               setMode('type')
               resetSentenceState()
             }}
           >
-            ⌨️ 整句键盘盲打
+            <IconKeyboard size={15} /> 整句键盘盲打
           </button>
         </div>
       </div>
 
-      <div className="progress"><div className="progress__fill" style={{ width: `${progress}%` }} /></div>
+      <div className="progress" role="progressbar" aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100}>
+        <div className="progress__fill" style={{ width: `${progress}%` }} />
+      </div>
 
       {/* Main Sentence Stage */}
       <div className="sentence-stage glass">
         <div className="sentence-prompt">
           <span className="sentence-prompt__zh">{current.zh}</span>
-          <button className="icon-btn" title="朗读整句 (Enter)" onClick={() => speak(current.ar)}>🔊</button>
+          <button className="icon-btn" aria-label="朗读整句 (Enter)" title="朗读整句 (Enter)" onClick={() => speak(current.ar)}>
+            <IconVolume size={18} />
+          </button>
         </div>
 
         {mode === 'build' ? (
@@ -349,9 +381,7 @@ export function SentencePractice({ title, sentences, settings, setSettings, onCo
               })}
             </div>
             {settings.showTranslit && <div className="word-tr">{current.tr}</div>}
-            {expectedChar && isMark(expectedChar) && (
-              <span className="mark-hint">下一个动符：{MARK_NAMES[expectedChar]}</span>
-            )}
+            {expectedChar && isMark(expectedChar) && <span className="mark-hint">下一个动符：{MARK_NAMES[expectedChar]}</span>}
           </div>
         )}
 
@@ -359,7 +389,15 @@ export function SentencePractice({ title, sentences, settings, setSettings, onCo
           <div className="sentence-solved">
             <div className="word-tr">{current.tr}</div>
             <button className="btn btn--gold" onClick={nextSentence}>
-              {idx + 1 < sentences.length ? '下一句 (Enter) →' : '完成本课 🎉'}
+              {idx + 1 < sentences.length ? (
+                <>
+                  下一句 (Enter) <IconArrowRight size={16} />
+                </>
+              ) : (
+                <>
+                  完成本课 <IconTrophy size={16} />
+                </>
+              )}
             </button>
           </div>
         )}
@@ -368,20 +406,33 @@ export function SentencePractice({ title, sentences, settings, setSettings, onCo
       {/* Sentence X-Ray (语法解剖透视台) */}
       <div className="xray glass">
         <div className="xray__head">
-          <div>
-            <b>🔬 语法透视台（Sentence X-Ray）</b>
+          <div className="xray__title">
+            <IconEye size={17} />
+            <b>语法透视台（Sentence X-Ray）</b>
             <span className="muted"> · 点击句中任意单词查看它的格位、词性与变尾原因</span>
           </div>
           <div className="options">
-            <button className={'chip' + (xray ? ' chip--on' : '')} onClick={() => setXray(!xray)}>
+            <button
+              aria-pressed={xray}
+              className={'chip' + (xray ? ' chip--on' : '')}
+              onClick={() => setXray(!xray)}
+            >
               {xray ? '已展开透视' : '展开透视'}
             </button>
             {mode === 'type' && (
               <>
-                <button className={'chip' + (settings.requireMarks ? ' chip--on' : '')} onClick={() => setSettings((s) => ({ ...s, requireMarks: !s.requireMarks }))}>
+                <button
+                  aria-pressed={settings.requireMarks}
+                  className={'chip' + (settings.requireMarks ? ' chip--on' : '')}
+                  onClick={() => setSettings((s) => ({ ...s, requireMarks: !s.requireMarks }))}
+                >
                   必须打元音
                 </button>
-                <button className={'chip' + (settings.showKeyboard ? ' chip--on' : '')} onClick={() => setSettings((s) => ({ ...s, showKeyboard: !s.showKeyboard }))}>
+                <button
+                  aria-pressed={settings.showKeyboard}
+                  className={'chip' + (settings.showKeyboard ? ' chip--on' : '')}
+                  onClick={() => setSettings((s) => ({ ...s, showKeyboard: !s.showKeyboard }))}
+                >
                   屏幕键盘
                 </button>
               </>
@@ -410,12 +461,18 @@ export function SentencePractice({ title, sentences, settings, setSettings, onCo
             </div>
             {activeToken && (
               <div className="xray__detail">
-                <span className="xray__detail-ar ar" onClick={() => speak(activeToken.ar)}>{activeToken.ar}</span>
+                <button
+                  className="xray__detail-ar ar"
+                  aria-label={`朗读 ${activeToken.ar}`}
+                  onClick={() => speak(activeToken.ar)}
+                >
+                  {activeToken.ar}
+                </button>
                 <div>
                   <div>
                     <b>{activeToken.zh}</b> ({activeToken.tr}) · <span className="gold-text">{activeToken.role}</span>
                   </div>
-                  {activeToken.note && <p className="muted" style={{ margin: '4px 0 0' }}>💡 {activeToken.note}</p>}
+                  {activeToken.note && <p className="muted" style={{ margin: '4px 0 0' }}>解析：{activeToken.note}</p>}
                 </div>
               </div>
             )}

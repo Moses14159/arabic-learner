@@ -774,3 +774,4 @@ export const COURSE_LESSONS: CourseLesson[] = [
 ]
 
 export const ALL_SENTENCES: LessonSentence[] = COURSE_LESSONS.flatMap((l) => l.sentences)
+

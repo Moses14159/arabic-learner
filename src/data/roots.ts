@@ -246,3 +246,4 @@ export const VERB_PARADIGMS: VerbParadigm[] = [
     ],
   },
 ]
+

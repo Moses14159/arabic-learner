@@ -5,6 +5,7 @@ import { FORM_LABEL, formsFor, letterForm, shuffle } from '../lib/arabic'
 import type { Form } from '../lib/arabic'
 import { KEY_FOR_CHAR, KEY_BY_CODE } from '../lib/keyboard'
 import { speak } from '../lib/audio'
+import { IconBook, IconFlame, IconMoon, IconPuzzle, IconSparkles, IconSun, IconVolume } from './Icons'
 
 const MAIN = LETTERS.filter((l) => !l.extra)
 const EXTRA = LETTERS.filter((l) => l.extra)
@@ -21,7 +22,13 @@ function LetterDetail({ letter }: { letter: Letter }) {
   return (
     <div className="letter-detail glass" key={letter.char}>
       <div className="letter-detail__head">
-        <button id="btn-letter-speak" className="letter-detail__big ar" onClick={() => speak(letter.name)} title="点击朗读">
+        <button
+          id="btn-letter-speak"
+          className="letter-detail__big ar"
+          aria-label={`朗读字母 ${letter.nameLatin}`}
+          onClick={() => speak(letter.name)}
+          title="点击朗读"
+        >
           {letter.char}
         </button>
         <div>
@@ -32,7 +39,8 @@ function LetterDetail({ letter }: { letter: Letter }) {
             转写 <b>{letter.translit}</b> · 键位 <kbd>{keyLabel(letter.char)}</kbd>
             {!letter.extra && (
               <span className={'sunmoon-tag ' + (isSun ? 'sunmoon-tag--sun' : 'sunmoon-tag--moon')}>
-                {isSun ? '☀️ 太阳字母' : '🌙 月亮字母'}
+                {isSun ? <IconSun size={13} /> : <IconMoon size={13} />}
+                {isSun ? '太阳字母' : '月亮字母'}
               </span>
             )}
           </p>
@@ -47,13 +55,15 @@ function LetterDetail({ letter }: { letter: Letter }) {
           </div>
         ))}
       </div>
-      {letter.joining === 'right' && <p className="note">⚠️ 单向连写字母：只连前面，不和后面的字母相连，因此只有独立和词尾两种形态。</p>}
-      {letter.joining === 'none' && <p className="note">⚠️ 独立的 hamza 不与任何字母相连。</p>}
+      {letter.joining === 'right' && (
+        <p className="note">单向连写字母：只连前面，不和后面的字母相连，因此只有独立和词尾两种形态。</p>
+      )}
+      {letter.joining === 'none' && <p className="note">独立的 hamza 不与任何字母相连。</p>}
       <button id="btn-example-speak" className="example" onClick={() => speak(letter.example.ar)}>
         <span className="ar">{letter.example.ar}</span>
         <span>{letter.example.tr}</span>
         <span className="muted">{letter.example.zh}</span>
-        <span>🔊</span>
+        <IconVolume size={18} />
       </button>
     </div>
   )
@@ -96,7 +106,12 @@ function HarakatLab() {
 
       <div className="letter-detail glass" key={sel.id}>
         <div className="letter-detail__head">
-          <button className="letter-detail__big ar" onClick={() => speak(sel.sampleWithBa)} title="点击试听 ب 的拼读">
+          <button
+            className="letter-detail__big ar"
+            aria-label={`朗读 ${sel.sampleSound}`}
+            onClick={() => speak(sel.sampleWithBa)}
+            title="点击试听 ب 的拼读"
+          >
             {sel.sampleWithBa}
           </button>
           <div>
@@ -110,14 +125,20 @@ function HarakatLab() {
           </div>
         </div>
         <div className="grammar-callout">
-          <p><b>📖 拼读要领：</b>{sel.desc}</p>
-          <p><b>🧭 语法作用：</b>{sel.grammarTip}</p>
+          <p>
+            <b>拼读要领：</b>
+            {sel.desc}
+          </p>
+          <p>
+            <b>语法作用：</b>
+            {sel.grammarTip}
+          </p>
         </div>
         <button className="example" onClick={() => speak(sel.example.ar)}>
           <span className="ar">{sel.example.ar}</span>
           <span>{sel.example.tr}</span>
           <span className="muted">{sel.example.zh}</span>
-          <span>🔊</span>
+          <IconVolume size={18} />
         </button>
       </div>
     </div>
@@ -131,14 +152,16 @@ function SunMoonLab() {
   return (
     <div className="sunmoon-lab">
       <div className="glass" style={{ padding: 24 }}>
-        <h2>☀️ 太阳字母 vs 🌙 月亮字母（الشَّمْسِيَّة وَالْقَمَرِيَّة）</h2>
+        <h2>太阳字母 vs 月亮字母（الشَّمْسِيَّة وَالْقَمَرِيَّة）</h2>
         <p className="muted" style={{ marginTop: 6 }}>
           阿语的定冠词 <b>الـ (al-)</b> 加在 28 个字母前面时，正好对半分（14 个太阳字母 + 14 个月亮字母）：
           舌尖靠近齿龈的 14 个字母会把冠词里的 <b>ل (l)</b> 「吃掉同化」，使首字母双写加叠音符 <b>ّ</b>；其余 14 个字母则清晰读出 <b>al-</b>。
         </p>
         <div className="sunmoon-split">
           <div className="sunmoon-box sunmoon-box--sun">
-            <h3>☀️ 14 个太阳字母（冠词 ل 不发音，同化双写）</h3>
+            <h3>
+              <IconSun size={17} /> 14 个太阳字母（冠词 ل 不发音，同化双写）
+            </h3>
             <p className="muted">发音部位都在舌尖/齿龈，读 l 再读它们太绕口，干脆直接叠音！</p>
             <div className="sunmoon-pills" dir="rtl">
               {sunList.map((l) => (
@@ -150,7 +173,9 @@ function SunMoonLab() {
             </div>
           </div>
           <div className="sunmoon-box sunmoon-box--moon">
-            <h3>🌙 14 个月亮字母（冠词 الْـ 清晰发 l 音）</h3>
+            <h3>
+              <IconMoon size={17} /> 14 个月亮字母（冠词 الْـ 清晰发 l 音）
+            </h3>
             <p className="muted">发音部位在双唇、喉部或软腭，与舌尖 l 互不干扰，保持原音。</p>
             <div className="sunmoon-pills" dir="rtl">
               {moonList.map((l) => (
@@ -169,18 +194,25 @@ function SunMoonLab() {
           <button key={ex.withAl} className="sunmoon-card glass" onClick={() => speak(ex.withAl)}>
             <div className="sunmoon-card__top">
               <span className={'sunmoon-tag ' + (ex.type === 'sun' ? 'sunmoon-tag--sun' : 'sunmoon-tag--moon')}>
-                {ex.type === 'sun' ? '☀️ 太阳同化' : '🌙 月亮保留'}
+                {ex.type === 'sun' ? <IconSun size={13} /> : <IconMoon size={13} />}
+                {ex.type === 'sun' ? '太阳同化' : '月亮保留'}
               </span>
               <span className="muted">{ex.zh}</span>
-              <span style={{ marginLeft: 'auto' }}>🔊</span>
+              <span style={{ marginLeft: 'auto' }} aria-hidden="true">
+                <IconVolume size={16} />
+              </span>
             </div>
             <div className="sunmoon-card__transform ar" dir="rtl">
               <span>{ex.bare}</span>
               <span className="muted">←</span>
               <b className="gold-text">{ex.withAl}</b>
             </div>
-            <div className="word-tr" style={{ fontSize: 16 }}>{ex.tr}</div>
-            <p className="muted" style={{ fontSize: 13, margin: 0, textAlign: 'left' }}>{ex.ruleNote}</p>
+            <div className="word-tr" style={{ fontSize: 16 }}>
+              {ex.tr}
+            </div>
+            <p className="muted" style={{ fontSize: 13, margin: 0, textAlign: 'left' }}>
+              {ex.ruleNote}
+            </p>
           </button>
         ))}
       </div>
@@ -241,12 +273,18 @@ function Quiz() {
   return (
     <div className="quiz glass">
       <div className="quiz__score">
-        <span>正确 {score.right}/{score.total}</span>
-        <span>连对 🔥 {score.streak}</span>
+        <span>
+          正确 {score.right}/{score.total}
+        </span>
+        <span>
+          <IconFlame size={15} /> 连对 {score.streak}
+        </span>
         <span>最佳 {score.best}</span>
       </div>
       <p className="muted">这是哪个字母的「{FORM_LABEL[q.form]}」形态？</p>
-      <div className="quiz__glyph ar" key={q.letter.char + q.form}>{letterForm(q.letter.char, q.form)}</div>
+      <div className="quiz__glyph ar" key={q.letter.char + q.form}>
+        {letterForm(q.letter.char, q.form)}
+      </div>
       <div className="quiz__options">
         {q.options.map((o, i) => {
           const state = !picked ? '' : o === q.letter ? ' is-right' : o === picked ? ' is-wrong' : ' is-dim'
@@ -270,22 +308,32 @@ export function Letters() {
 
   return (
     <section className="letters">
-      <div className="seg">
-        <button id="seg-learn" className={mode === 'learn' ? 'on' : ''} onClick={() => setMode('learn')}>28 字母与四形态</button>
-        <button id="seg-harakat" className={mode === 'harakat' ? 'on' : ''} onClick={() => setMode('harakat')}>动符与拼读规则</button>
-        <button id="seg-sunmoon" className={mode === 'sunmoon' ? 'on' : ''} onClick={() => setMode('sunmoon')}>太阳与月亮字母</button>
-        <button id="seg-quiz" className={mode === 'quiz' ? 'on' : ''} onClick={() => setMode('quiz')}>形态辨析测验</button>
+      <div className="seg" role="tablist" aria-label="字母与拼读子模块">
+        <button role="tab" aria-selected={mode === 'learn'} id="seg-learn" className={mode === 'learn' ? 'on' : ''} onClick={() => setMode('learn')}>
+          <IconBook size={15} /> 28 字母与四形态
+        </button>
+        <button role="tab" aria-selected={mode === 'harakat'} id="seg-harakat" className={mode === 'harakat' ? 'on' : ''} onClick={() => setMode('harakat')}>
+          <IconSparkles size={15} /> 动符与拼读规则
+        </button>
+        <button role="tab" aria-selected={mode === 'sunmoon'} id="seg-sunmoon" className={mode === 'sunmoon' ? 'on' : ''} onClick={() => setMode('sunmoon')}>
+          <IconSun size={15} /> 太阳与月亮字母
+        </button>
+        <button role="tab" aria-selected={mode === 'quiz'} id="seg-quiz" className={mode === 'quiz' ? 'on' : ''} onClick={() => setMode('quiz')}>
+          <IconPuzzle size={15} /> 形态辨析测验
+        </button>
       </div>
       {mode === 'quiz' && <Quiz />}
       {mode === 'harakat' && <HarakatLab />}
       {mode === 'sunmoon' && <SunMoonLab />}
       {mode === 'learn' && (
         <div className="letters__layout">
-          <div className="letter-grid" dir="rtl">
+          <div className="letter-grid" dir="rtl" role="listbox" aria-label="阿拉伯语字母表">
             {grid.map((l) => (
               <button
                 id={`letter-${l.nameLatin.replace(/\W/g, '')}`}
                 key={l.char}
+                role="option"
+                aria-selected={l === sel}
                 className={'letter-card' + (l === sel ? ' is-on' : '') + (l.extra ? ' letter-card--extra' : '')}
                 onClick={() => {
                   setSel(l)

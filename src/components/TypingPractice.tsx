@@ -5,6 +5,7 @@ import { charsFromEvent, KEY_FOR_CHAR, MARK_NAMES } from '../lib/keyboard'
 import { hasArabicVoice, sfx, speak } from '../lib/audio'
 import type { SessionRecord, Settings } from '../lib/storage'
 import { Keyboard } from './Keyboard'
+import { IconArrowLeft, IconArrowRight, IconRefresh, IconTrophy, IconVolume } from './Icons'
 
 interface Props {
   title: string
@@ -241,6 +242,7 @@ export function TypingPractice({ title, words, settings, setSettings, onMistake,
   const toggle = (k: keyof Settings, label: string) => (
     <button
       id={`opt-${k}`}
+      aria-pressed={settings[k]}
       className={'chip' + (settings[k] ? ' chip--on' : '')}
       onClick={(e) => {
         setSettings((x) => ({ ...x, [k]: !x[k] }))
@@ -256,7 +258,9 @@ export function TypingPractice({ title, words, settings, setSettings, onMistake,
     return (
       <section className="practice">
         <div className="result glass">
-          <div className="result__badge">{accuracy >= 95 ? '🏆' : accuracy >= 80 ? '✨' : '💪'}</div>
+          <div className="result__badge">
+            <IconTrophy size={42} />
+          </div>
           <h2>本章完成：{title}</h2>
           <p className="muted">أَحْسَنْتَ！(aḥsanta，干得好)</p>
           <div className="result__stats">
@@ -279,11 +283,17 @@ export function TypingPractice({ title, words, settings, setSettings, onMistake,
             </div>
           )}
           <div className="result__actions">
-            <button id="btn-repeat" className="btn" onClick={() => restart(words)}>再来一遍 ⏎</button>
+            <button id="btn-repeat" className="btn" onClick={() => restart(words)}>
+              <IconRefresh size={16} /> 再来一遍
+            </button>
             {uniqMissed.length > 0 && (
               <button id="btn-retry-missed" className="btn" onClick={() => restart(uniqMissed)}>只练错词</button>
             )}
-            {onNext && <button id="btn-next-chapter" className="btn btn--gold" onClick={onNext}>下一章 →</button>}
+            {onNext && (
+              <button id="btn-next-chapter" className="btn btn--gold" onClick={onNext}>
+                下一章 <IconArrowRight size={16} />
+              </button>
+            )}
             <button id="btn-back-result" className="btn btn--ghost" onClick={onBack}>返回章节</button>
           </div>
         </div>
@@ -294,7 +304,9 @@ export function TypingPractice({ title, words, settings, setSettings, onMistake,
   return (
     <section className="practice">
       <div className="practice__top">
-        <button id="btn-back" className="btn btn--ghost btn--sm" onClick={onBack}>← 章节</button>
+        <button id="btn-back" className="btn btn--ghost btn--sm" onClick={onBack}>
+          <IconArrowLeft size={16} /> 返回章节
+        </button>
         <h2 className="practice__title">{title}</h2>
         <div className="stats-bar">
           <div><b>{fmtTime(elapsed)}</b><span>时间</span></div>
@@ -327,7 +339,9 @@ export function TypingPractice({ title, words, settings, setSettings, onMistake,
           {settings.showTranslit && revealed && <div className="word-tr">{word.tr}</div>}
           <div className="word-zh">{word.zh}</div>
           <div className="word-tools">
-            <button id="btn-speak" className="icon-btn" title="朗读 (Enter)" onClick={(e) => { speak(word.ar); e.currentTarget.blur() }}>🔊</button>
+            <button id="btn-speak" className="icon-btn" aria-label="朗读单词 (Enter)" title="朗读 (Enter)" onClick={(e) => { speak(word.ar); e.currentTarget.blur() }}>
+              <IconVolume size={18} />
+            </button>
             {expected && isMark(expected) && <span className="mark-hint">下一个：{MARK_NAMES[expected]}</span>}
           </div>
           {!hasArabicVoice() && <p className="warn">未检测到阿语语音。macOS 可在「系统设置 → 辅助功能 → 朗读内容 → 系统声音」中添加 Arabic 语音。</p>}
