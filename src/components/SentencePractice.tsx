@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { LessonSentence, WordToken } from '../data/grammar'
-import { ALL_SENTENCES } from '../data/grammar'
+import { ALL_SENTENCES, caseTypeForToken } from '../data/grammar'
 import { clusterText, isMark, shuffle, toClusters } from '../lib/arabic'
 import { charsFromEvent, KEY_FOR_CHAR, MARK_NAMES } from '../lib/keyboard'
 import { sfx, speak } from '../lib/audio'
@@ -442,22 +442,31 @@ export function SentencePractice({ title, sentences, settings, setSettings, onCo
 
         {xray && (
           <>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <small className="muted">格位色标：</small>
+              <span className="case-pill case-pill--nom">مَرْفُوع · 主格 (-u)</span>
+              <span className="case-pill case-pill--acc">مَنْصُوب · 宾格 (-a)</span>
+              <span className="case-pill case-pill--gen">مَجْرُور · 属格 (-i)</span>
+            </div>
             <div className="xray__tokens" dir="rtl">
-              {current.tokens.map((t, i) => (
-                <button
-                  key={i}
-                  className={'xray-token' + (activeTokenIdx === i ? ' is-on' : '')}
-                  onClick={() => {
-                    setActiveTokenIdx(i)
-                    speak(t.ar)
-                  }}
-                >
-                  <span className="xray-token__ar ar">{t.ar}</span>
-                  <span className="xray-token__tr">{t.tr}</span>
-                  <span className="xray-token__zh">{t.zh}</span>
-                  <span className="xray-token__badge">{t.role}</span>
-                </button>
-              ))}
+              {current.tokens.map((t, i) => {
+                const cType = caseTypeForToken(t)
+                return (
+                  <button
+                    key={i}
+                    className={'xray-token' + (activeTokenIdx === i ? ' is-on' : '')}
+                    onClick={() => {
+                      setActiveTokenIdx(i)
+                      speak(t.ar)
+                    }}
+                  >
+                    <span className="xray-token__ar ar">{t.ar}</span>
+                    <span className="xray-token__tr">{t.tr}</span>
+                    <span className="xray-token__zh">{t.zh}</span>
+                    <span className={'xray-token__badge' + (cType ? ` case-pill--${cType}` : '')}>{t.role}</span>
+                  </button>
+                )
+              })}
             </div>
             {activeToken && (
               <div className="xray__detail">

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { COURSE_LESSONS } from '../data/grammar'
+import { COURSE_LESSONS, caseTypeForToken } from '../data/grammar'
 import type { CourseLesson, LessonSentence } from '../data/grammar'
 import type { Word } from '../data/words'
 import { speak } from '../lib/audio'
@@ -165,14 +165,17 @@ export function CourseMap({ lessonScores, onStartWordTyping, onStartSentencePrac
                 </div>
               </div>
               <div className="xray__tokens" dir="rtl">
-                {s.tokens.map((t, tIdx) => (
-                  <button key={tIdx} className="xray-token" onClick={() => speak(t.ar)} title={t.note}>
-                    <span className="xray-token__ar ar">{t.ar}</span>
-                    <span className="xray-token__tr">{t.tr}</span>
-                    <span className="xray-token__zh">{t.zh}</span>
-                    <span className="xray-token__badge">{t.role}</span>
-                  </button>
-                ))}
+                {s.tokens.map((t, tIdx) => {
+                  const cType = caseTypeForToken(t)
+                  return (
+                    <button key={tIdx} className="xray-token" onClick={() => speak(t.ar)} title={t.note}>
+                      <span className="xray-token__ar ar">{t.ar}</span>
+                      <span className="xray-token__tr">{t.tr}</span>
+                      <span className="xray-token__zh">{t.zh}</span>
+                      <span className={'xray-token__badge' + (cType ? ` case-pill--${cType}` : '')}>{t.role}</span>
+                    </button>
+                  )
+                })}
               </div>
             </div>
           ))}
