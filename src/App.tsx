@@ -3,7 +3,8 @@ import type { ReactNode } from 'react'
 import { ALL_WORDS, CHAPTERS } from './data/words'
 import type { Word } from './data/words'
 import type { CourseLesson, LessonSentence } from './data/grammar'
-import { shuffle } from './lib/arabic'
+import { shuffle, stripMarks } from './lib/arabic'
+import { speak } from './lib/audio'
 import { DEFAULT_SETTINGS, useStored, useStoredList } from './lib/storage'
 import type { MistakeBook, SessionRecord } from './lib/storage'
 import { TypingPractice } from './components/TypingPractice'
@@ -46,6 +47,7 @@ export default function App() {
   const [book, setBook] = useStored<MistakeBook>('qalam.mistakes', {})
   const [sessions, setSessions] = useStoredList<SessionRecord>('qalam.sessions')
   const [lessonScores, setLessonScores] = useStored<Record<string, number>>('qalam.lessons', {})
+  const [wordQuery, setWordQuery] = useState('')
   const [theme, setTheme] = useState<'night' | 'light' | 'emerald'>(() => {
     const saved = localStorage.getItem('qalam.theme')
     if (saved === 'light' || saved === 'emerald' || saved === 'night') return saved
@@ -244,13 +246,85 @@ export default function App() {
                   <button
                     id="btn-random-review"
                     className="btn"
-                    onClick={() => setPractice({ title: '随机 20 词复习', words: shuffle(ALL_WORDS).slice(0, 20), id: Date.now() })}
+                    onClick={() => setPractice({ title: '随机 25 词闪电复习', words: shuffle(ALL_WORDS).slice(0, 25), id: Date.now() })}
                   >
-                    <IconRefresh size={17} /> 随机抽取 20 词
+                    <IconRefresh size={17} /> 随机抽取 25 词
                   </button>
                 </div>
               </div>
-              <h2 className="section-title">12 大主题章节（共 {ALL_WORDS.length + 28} 词）</h2>
+
+              {/* Live Dictionary Search Bar */}
+              <div className="verb-lab__bar glass" style={{ marginBottom: 18 }}>
+                <div style={{ flex: 1, minWidth: 240 }}>
+                  <b>全库词典检索（共 {ALL_WORDS.length} 词）</b>
+                  <p className="muted" style={{ margin: '2px 0 0', fontSize: 13 }}>
+                    支持输入中文释义、拉丁转写或阿语字母快速查词，点击词卡即可朗读发音或一键加入盲打。
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <input
+                    type="search"
+                    value={wordQuery}
+                    onChange={(e) => setWordQuery(e.target.value)}
+                    placeholder="搜索中文 / 音标 / 阿语（如：学校、kitab、مسجد）…"
+                    style={{
+                      padding: '9px 14px',
+                      borderRadius: 12,
+                      border: '1px solid var(--border-hi)',
+                      background: 'var(--surface-inset)',
+                      color: 'var(--text)',
+                      font: 'inherit',
+                      minWidth: 280,
+                    }}
+                  />
+                  {wordQuery.trim() && (
+                    <button className="btn btn--ghost btn--sm" onClick={() => setWordQuery('')}>
+                      清空
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {wordQuery.trim() ? (
+                (() => {
+                  const q = wordQuery.trim().toLowerCase()
+                  const matches = ALL_WORDS.filter(
+                    (w) =>
+                      w.zh.toLowerCase().includes(q) ||
+                      w.tr.toLowerCase().includes(q) ||
+                      w.ar.includes(q) ||
+                      stripMarks(w.ar).includes(stripMarks(q)),
+                  )
+                  return (
+                    <div style={{ marginBottom: 28 }}>
+                      <div className="lesson-sec-head" style={{ marginBottom: 12 }}>
+                        <h2 className="section-title">搜索结果：找到 {matches.length} 个词</h2>
+                        {matches.length > 0 && (
+                          <button
+                            className="btn btn--gold btn--sm"
+                            onClick={() => startCustomTyping(`搜索特训：${wordQuery.trim()}`, matches.slice(0, 40))}
+                          >
+                            <IconKeyboard size={15} /> 盲打这组搜索结果 ({Math.min(matches.length, 40)})
+                          </button>
+                        )}
+                      </div>
+                      <div className="vocab-grid">
+                        {matches.slice(0, 60).map((w, idx) => (
+                          <button key={`${w.ar}-${idx}`} className="vocab-item glass" onClick={() => speak(w.ar)}>
+                            <span className="vocab-item__ar ar">{w.ar}</span>
+                            <span className="word-tr" style={{ fontSize: 13 }}>
+                              {w.tr}
+                            </span>
+                            <b>{w.zh}</b>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()
+              ) : null}
+
+              <h2 className="section-title">{CHAPTERS.length} 大主题章节（共 {ALL_WORDS.length + 28} 词）</h2>
               <div className="chapters">
                 {CHAPTERS.map((c, i) => {
                   const best = bestByTitle.get(c.title)

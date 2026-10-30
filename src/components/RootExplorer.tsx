@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ROOT_FAMILIES, VERB_PARADIGMS, WAZN_TEMPLATES } from '../data/roots'
 import type { RootFamily, VerbParadigm } from '../data/roots'
-import { DECLENSION_NOUNS, GRAMMAR_QUIZ_BANK, TEN_VERB_FORMS } from '../data/morphology'
+import { BROKEN_PLURAL_PATTERNS, DECLENSION_NOUNS, GRAMMAR_QUIZ_BANK, TEN_VERB_FORMS } from '../data/morphology'
 import type { DeclensionNoun, NounDeclensionCell, VerbFormEntry } from '../data/morphology'
 import type { Word } from '../data/words'
 import { speak } from '../lib/audio'
@@ -192,6 +192,71 @@ function NounDeclensionSandbox({ onPracticeWords }: { onPracticeWords: (title: s
         <button className="icon-btn" style={{ marginLeft: 'auto' }} aria-label="朗读" onClick={() => speak(currentCell.ar)}>
           <IconVolume size={18} />
         </button>
+      </div>
+
+      {/* Broken Plural Atlas */}
+      <div className="verb-lab__bar glass" style={{ marginTop: 12 }}>
+        <div>
+          <h3>附：阿语「破碎复数」8 大核心模具（جَمْعُ التَّكْسِير · Broken Plurals）</h3>
+          <p className="muted" style={{ margin: '4px 0 0' }}>
+            阿语约 60% 的高频名词不加后缀 ـُونَ / ـَات，而是像英语 man → men 一样通过<b>重组内部元音与长音</b>构成复数。记住下面 8 个模具即可攻克绝大多数不规则复数！
+          </p>
+        </div>
+        <button
+          className="btn btn--gold btn--sm"
+          onClick={() =>
+            onPracticeWords(
+              '破碎复数 24 组高频单复数特训',
+              BROKEN_PLURAL_PATTERNS.flatMap((bp) =>
+                bp.pairs.map((p) => ({
+                  ar: p.plurAr,
+                  tr: p.plurTr,
+                  zh: `${p.zh}（复数 ← 单数 ${p.singAr}）`,
+                })),
+              ),
+            )
+          }
+        >
+          <IconKeyboard size={15} /> 打字特训 24 组破碎复数
+        </button>
+      </div>
+
+      <div className="wazn-grid">
+        {BROKEN_PLURAL_PATTERNS.map((bp) => (
+          <div key={bp.pattern} className="wazn-card glass">
+            <div className="wazn-card__head">
+              <span className="wazn-card__ar ar">{bp.pattern}</span>
+              <div>
+                <b>{bp.tr}</b>
+                <div className="muted" style={{ fontSize: 12 }}>
+                  {bp.singularHint}
+                </div>
+              </div>
+            </div>
+            <p className="muted" style={{ fontSize: 13, margin: '8px 0' }}>
+              {bp.desc}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
+              {bp.pairs.map((p) => (
+                <button
+                  key={p.plurAr}
+                  className="grammar-ex"
+                  style={{ padding: '6px 10px' }}
+                  onClick={() => speak(`${p.singAr} ، ${p.plurAr}`)}
+                >
+                  <div className="grammar-ex__main" style={{ justifyContent: 'space-between', width: '100%' }}>
+                    <span className="ar" style={{ fontSize: 22 }}>
+                      {p.singAr} <span className="muted">←</span> <span className="gold-text">{p.plurAr}</span>
+                    </span>
+                    <span style={{ fontSize: 13 }}>
+                      <b>{p.zh}</b> <small className="muted">({p.plurTr})</small>
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )
