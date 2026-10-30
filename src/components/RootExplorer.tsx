@@ -318,13 +318,19 @@ function TenFormsAtlas({ onPracticeWords }: { onPracticeWords: (title: string, w
   )
 }
 
+const QUIZ_CATEGORIES = ['全部', '句法变格', '正偏与定语', '动词变位', '词根与词法'] as const
+type QuizCategory = (typeof QUIZ_CATEGORIES)[number]
+
 function GrammarQuizLab() {
+  const [cat, setCat] = useState<QuizCategory>('全部')
   const [qIdx, setQIdx] = useState(0)
   const [picked, setPicked] = useState<number | null>(null)
   const [score, setScore] = useState({ right: 0, total: 0, streak: 0, best: 0 })
 
-  const q = GRAMMAR_QUIZ_BANK[qIdx]
+  const pool = cat === '全部' ? GRAMMAR_QUIZ_BANK : GRAMMAR_QUIZ_BANK.filter((item) => item.category === cat)
+  const q = pool[qIdx % pool.length]
   const isCorrect = picked === q.correctIndex
+  const fullAr = [q.sentenceBefore, q.options[q.correctIndex].ar, q.sentenceAfter].filter(Boolean).join(' ')
 
   const choose = (i: number) => {
     if (picked !== null) return
@@ -339,7 +345,7 @@ function GrammarQuizLab() {
 
   const nextQ = () => {
     setPicked(null)
-    setQIdx((idx) => (idx + 1) % GRAMMAR_QUIZ_BANK.length)
+    setQIdx((idx) => (idx + 1) % pool.length)
   }
 
   useEffect(() => {
@@ -359,17 +365,36 @@ function GrammarQuizLab() {
   })
 
   return (
-    <div className="quiz glass" style={{ maxWidth: 740, padding: 32 }}>
+    <div className="quiz glass" style={{ maxWidth: 780, padding: 32 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 14 }}>
+        {QUIZ_CATEGORIES.map((c) => {
+          const count = c === '全部' ? GRAMMAR_QUIZ_BANK.length : GRAMMAR_QUIZ_BANK.filter((x) => x.category === c).length
+          return (
+            <button
+              key={c}
+              className={'chip' + (cat === c ? ' chip--on' : '')}
+              onClick={() => {
+                setCat(c)
+                setQIdx(0)
+                setPicked(null)
+              }}
+            >
+              {c} ({count})
+            </button>
+          )
+        })}
+      </div>
+
       <div className="quiz__score">
         <span className="chip chip--on">{q.category}</span>
         <span>
-          题目 {qIdx + 1}/{GRAMMAR_QUIZ_BANK.length}
+          题目 {(qIdx % pool.length) + 1}/{pool.length}
         </span>
         <span>
           正确 {score.right}/{score.total}
         </span>
         <span>
-          <IconFlame size={15} /> 连对 {score.streak}
+          <IconFlame size={15} /> 连对 {score.streak}（最高 {score.best}）
         </span>
       </div>
 
@@ -405,8 +430,8 @@ function GrammarQuizLab() {
       </div>
 
       {picked !== null && (
-        <div className="grammar-quiz-explain">
-          <div style={{ textAlign: 'left', flex: 1 }}>
+        <div className="grammar-quiz-explain" style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <div style={{ textAlign: 'left', flex: 1, minWidth: 240 }}>
             <b style={{ color: isCorrect ? 'var(--emerald)' : 'var(--gold-2)' }}>
               {isCorrect ? '回答正确！' : `正确答案：${q.options[q.correctIndex].ar}`}
             </b>
@@ -414,9 +439,14 @@ function GrammarQuizLab() {
               {q.explanation}
             </p>
           </div>
-          <button className="btn btn--gold btn--sm" onClick={nextQ}>
-            下一题 (Enter) <IconArrowRight size={15} />
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn--sm" onClick={() => speak(fullAr)}>
+              <IconVolume size={15} /> 朗读答案
+            </button>
+            <button className="btn btn--gold btn--sm" onClick={nextQ}>
+              下一题 (Enter) <IconArrowRight size={15} />
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -626,31 +656,58 @@ export function RootExplorer({ onPracticeWords }: Props) {
 
       {sub === 'wazn' && (
         <div className="wazn-lab">
-          <div className="glass" style={{ padding: 24 }}>
-            <h2>什么是「词型模具（الْوَزْن Wazn）」？</h2>
-            <p className="muted" style={{ marginTop: 6 }}>
-              阿拉伯语语法学家用 <b>ف - ع - ل (f - ʿ - l，「做」)</b> 这三个字母作为「公式占位符」：
-              <b>ف</b> 代表第 1 个根字母，<b>ع</b> 代表第 2 个根字母，<b>ل</b> 代表第 3 个根字母。只要学会下面 6 个核心模具，背 1 个词根就能自动认出 6 个单词！
-            </p>
+          <div className="verb-lab__bar glass">
+            <div>
+              <h2>什么是「词型模具（الْوَزْن Wazn）」？</h2>
+              <p className="muted" style={{ marginTop: 6 }}>
+                阿拉伯语语法学家用 <b>ف - ع - ل (f - ʿ - l，「做」)</b> 这三个字母作为「公式占位符」：
+                <b>ف</b> 代表第 1 个根字母，<b>ع</b> 代表第 2 个根字母，<b>ل</b> 代表第 3 个根字母。学会下面 6 个核心模具，背 1 个词根就能自动认出 6 个单词！
+              </p>
+            </div>
+            <button
+              className="btn btn--gold btn--sm"
+              onClick={() =>
+                onPracticeWords(
+                  '六大词型模具代表词',
+                  WAZN_TEMPLATES.map((w) => {
+                    const arWord = w.example.split(' ')[0]
+                    return { ar: arWord, tr: w.tr, zh: `[${w.role}] ${w.example}` }
+                  }),
+                )
+              }
+            >
+              <IconKeyboard size={15} /> 打字练习模具代表词
+            </button>
           </div>
           <div className="wazn-grid">
-            {WAZN_TEMPLATES.map((w) => (
-              <div key={w.pattern} className="wazn-card glass">
-                <div className="wazn-card__head">
-                  <span className="wazn-card__ar ar">{w.pattern}</span>
-                  <div>
-                    <b>{w.role}</b>
-                    <div className="word-tr" style={{ fontSize: 15 }}>
-                      {w.tr}
+            {WAZN_TEMPLATES.map((w) => {
+              const sampleAr = w.example.split(' ')[0]
+              return (
+                <button
+                  key={w.pattern}
+                  className="wazn-card glass"
+                  style={{ textAlign: 'left' }}
+                  onClick={() => speak(sampleAr)}
+                >
+                  <div className="wazn-card__head">
+                    <span className="wazn-card__ar ar">{w.pattern}</span>
+                    <div>
+                      <b>{w.role}</b>
+                      <div className="word-tr" style={{ fontSize: 15 }}>
+                        {w.tr}
+                      </div>
                     </div>
+                    <span style={{ marginLeft: 'auto', color: 'var(--muted)' }}>
+                      <IconVolume size={16} />
+                    </span>
                   </div>
-                </div>
-                <p className="muted" style={{ fontSize: 14, margin: '8px 0' }}>
-                  {w.desc}
-                </p>
-                <div className="wazn-card__ex">例：{w.example}</div>
-              </div>
-            ))}
+                  <p className="muted" style={{ fontSize: 14, margin: '8px 0' }}>
+                    {w.desc}
+                  </p>
+                  <div className="wazn-card__ex">例：{w.example}（点击朗读）</div>
+                </button>
+              )
+            })}
           </div>
         </div>
       )}
