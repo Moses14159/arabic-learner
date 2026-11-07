@@ -4,7 +4,7 @@ import type { RootFamily, VerbParadigm } from '../data/roots'
 import { BROKEN_PLURAL_PATTERNS, DECLENSION_NOUNS, GRAMMAR_QUIZ_BANK, TEN_VERB_FORMS } from '../data/morphology'
 import type { DeclensionNoun, NounDeclensionCell, VerbFormEntry } from '../data/morphology'
 import type { Word } from '../data/words'
-import { speak } from '../lib/audio'
+import { formatPronunciation, speak } from '../lib/audio'
 import {
   IconArrowRight,
   IconBook,
@@ -183,30 +183,35 @@ function NounDeclensionSandbox({ onPracticeWords }: { onPracticeWords: (title: s
         </button>
         <div>
           <div>
-            <b>{currentCell.tr}</b> · 词尾标志 <span className="gold-text">{currentCell.suffix}</span>
+            <b>{currentCell.tr}</b> · 音节：<span className="gold-text">{formatPronunciation(currentCell.tr).syllables}</span> · 谐音：【{formatPronunciation(currentCell.tr).zhPhonetic}】 · 词尾标志 <span className="gold-text">{currentCell.suffix}</span>
           </div>
           <p className="muted" style={{ margin: '4px 0 0' }}>
             规律解析：{currentCell.rule}
           </p>
         </div>
-        <button className="icon-btn" style={{ marginLeft: 'auto' }} aria-label="朗读" onClick={() => speak(currentCell.ar)}>
-          <IconVolume size={18} />
-        </button>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+          <button className="btn btn--ghost btn--sm" onClick={() => speak(currentCell.ar, 0.55)}>
+            0.55x 慢读
+          </button>
+          <button className="icon-btn" aria-label="朗读" onClick={() => speak(currentCell.ar)}>
+            <IconVolume size={18} />
+          </button>
+        </div>
       </div>
 
       {/* Broken Plural Atlas */}
       <div className="verb-lab__bar glass" style={{ marginTop: 12 }}>
         <div>
-          <h3>附：阿语「破碎复数」8 大核心模具（جَمْعُ التَّكْسِير · Broken Plurals）</h3>
+          <h3>附：破碎复数（جَمْعُ التَّكْسِير）8 种高频词型</h3>
           <p className="muted" style={{ margin: '4px 0 0' }}>
-            阿语约 60% 的高频名词不加后缀 ـُونَ / ـَات，而是像英语 man → men 一样通过<b>重组内部元音与长音</b>构成复数。记住下面 8 个模具即可攻克绝大多数不规则复数！
+            阿拉伯语约半数常用名词不通过加词尾后缀（ـُونَ / ـَات）构成复数，而是通过<b>改变词干内部元音或增减长音字母</b>构成「破碎复数」。掌握以下 8 种典型词型即可归纳绝大多数常用破碎复数。
           </p>
         </div>
         <button
           className="btn btn--gold btn--sm"
           onClick={() =>
             onPracticeWords(
-              '破碎复数 24 组高频单复数特训',
+              '破碎复数 24 组高频单复数练习',
               BROKEN_PLURAL_PATTERNS.flatMap((bp) =>
                 bp.pairs.map((p) => ({
                   ar: p.plurAr,
@@ -217,7 +222,7 @@ function NounDeclensionSandbox({ onPracticeWords }: { onPracticeWords: (title: s
             )
           }
         >
-          <IconKeyboard size={15} /> 打字特训 24 组破碎复数
+          <IconKeyboard size={15} /> 打字练习 24 组破碎复数
         </button>
       </div>
 
@@ -278,13 +283,13 @@ function TenFormsAtlas({ onPracticeWords }: { onPracticeWords: (title: string, w
     <div className="verb-lab">
       <div className="verb-lab__bar glass">
         <div>
-          <h2>阿语「十式派生动词」模具图鉴（الأَوْزَانُ الْعَشَرَة · Form I ~ X）</h2>
+          <h2>三母简式与复式「十式动词」词型总表（الأَوْزَانُ الْعَشَرَة · I ~ X 式）</h2>
           <p className="muted" style={{ margin: '4px 0 0' }}>
-            阿语最强大的造词引擎：在三母词根（第 I 式）基础上，通过<b>双写叠音、加长音、加前缀（أَ / تَ / اِنْـ / اِسْتَـ）或插入中缀（ـتَـ）</b>，衍生出第 II 到第 X 式，规律极度工整！
+            以三母简式动词（第 I 式 فَعَلَ）为基础，通过<b>双写中母、延长元音、添加前缀（أَ / تَ / اِنْـ / اِسْتَـ）或中缀（ـتَـ）</b>，派生出第 II 至第 X 式三母复式动词，各自对应明确的语义范畴。
           </p>
         </div>
         <button className="btn btn--gold btn--sm" onClick={practiceTenForms}>
-          <IconKeyboard size={15} /> 打字特训十式代表词
+          <IconKeyboard size={15} /> 打字练习十式代表词
         </button>
       </div>
 
@@ -336,19 +341,19 @@ function TenFormsAtlas({ onPracticeWords }: { onPracticeWords: (title: string, w
               <span className="form__glyph ar" style={{ fontSize: 30 }}>
                 {sel.presentPattern}
               </span>
-              <span className="form__label">现在式模具</span>
+              <span className="form__label">现在式词型</span>
             </div>
             <div className="form">
               <span className="form__glyph ar" style={{ fontSize: 30 }}>
                 {sel.masdarPattern}
               </span>
-              <span className="form__label">词根名词 (Masdar)</span>
+              <span className="form__label">词源 (المَصْدَر)</span>
             </div>
             <div className="form">
               <span className="form__glyph ar" style={{ fontSize: 30 }}>
                 {sel.activeParticiple}
               </span>
-              <span className="form__label">主动分词 (施事者)</span>
+              <span className="form__label">主动名词 (اسْم الفَاعِل)</span>
             </div>
           </div>
 
@@ -374,7 +379,7 @@ function TenFormsAtlas({ onPracticeWords }: { onPracticeWords: (title: string, w
 
           <button className="example" onClick={() => speak(`${sel.example.pastAr} ، ${sel.example.presentAr} ، ${sel.example.masdarAr}`)}>
             <span className="ar">{sel.example.pastAr}</span>
-            <span>连读过去式 · 现在式 · 词根名词</span>
+            <span>连读：过去式 · 现在式 · 词源（动名词）</span>
             <IconVolume size={18} />
           </button>
         </div>
@@ -549,7 +554,7 @@ export function RootExplorer({ onPracticeWords }: Props) {
           <IconRefresh size={15} /> 动词人称变位表
         </button>
         <button role="tab" aria-selected={sub === 'wazn'} className={sub === 'wazn' ? 'on' : ''} onClick={() => setSub('wazn')}>
-          <IconLayers size={15} /> 词型模具 (Wazn)
+          <IconLayers size={15} /> 派生词型 (الوَزْن)
         </button>
         <button role="tab" aria-selected={sub === 'quiz'} className={sub === 'quiz' ? 'on' : ''} onClick={() => setSub('quiz')}>
           <IconPuzzle size={15} /> 语法与变位测验
@@ -604,24 +609,30 @@ export function RootExplorer({ onPracticeWords }: Props) {
             </div>
 
             <div className="derived-grid">
-              {selRoot.words.map((w) => (
-                <button key={w.ar} className="derived-card" onClick={() => speak(w.ar)}>
-                  <div className="derived-card__top">
-                    <span className="xray-token__badge">{w.waznRole}</span>
-                    <span className="ar muted" style={{ fontSize: 16 }}>
-                      模具 {w.wazn}
-                    </span>
-                  </div>
-                  <div className="derived-card__ar ar">{w.ar}</div>
-                  <div className="word-tr" style={{ fontSize: 16 }}>
-                    {w.tr}
-                  </div>
-                  <div className="derived-card__zh">
-                    <b>{w.zh}</b>
-                    <IconVolume size={16} />
-                  </div>
-                </button>
-              ))}
+              {selRoot.words.map((w) => {
+                const pron = formatPronunciation(w.tr)
+                return (
+                  <button key={w.ar} className="derived-card" onClick={() => speak(w.ar)}>
+                    <div className="derived-card__top">
+                      <span className="xray-token__badge">{w.waznRole}</span>
+                      <span className="ar muted" style={{ fontSize: 16 }}>
+                        词型 {w.wazn}
+                      </span>
+                    </div>
+                    <div className="derived-card__ar ar">{w.ar}</div>
+                    <div className="word-tr" style={{ fontSize: 16 }}>
+                      {pron.syllables}
+                    </div>
+                    <small className="muted" style={{ fontSize: 12 }}>
+                      谐音：{pron.zhPhonetic}
+                    </small>
+                    <div className="derived-card__zh">
+                      <b>{w.zh}</b>
+                      <IconVolume size={16} />
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           </div>
         </div>
@@ -723,17 +734,17 @@ export function RootExplorer({ onPracticeWords }: Props) {
         <div className="wazn-lab">
           <div className="verb-lab__bar glass">
             <div>
-              <h2>什么是「词型模具（الْوَزْن Wazn）」？</h2>
+              <h2>什么是「词型（الْوَزْن Wazn）」？</h2>
               <p className="muted" style={{ marginTop: 6 }}>
-                阿拉伯语语法学家用 <b>ف - ع - ل (f - ʿ - l，「做」)</b> 这三个字母作为「公式占位符」：
-                <b>ف</b> 代表第 1 个根字母，<b>ع</b> 代表第 2 个根字母，<b>ل</b> 代表第 3 个根字母。学会下面 6 个核心模具，背 1 个词根就能自动认出 6 个单词！
+                阿拉伯语语法学以 <b>ف - ع - ل (f - ʿ - l，「做」)</b> 三个字母作为词型范本：
+                <b>ف</b> 代表第一词根字母，<b>ع</b> 代表第二词根字母，<b>ل</b> 代表第三词根字母。掌握以下 {WAZN_TEMPLATES.length} 个核心派生词型，即可从一个三母词根推导出整组同族词汇。
               </p>
             </div>
             <button
               className="btn btn--gold btn--sm"
               onClick={() =>
                 onPracticeWords(
-                  '六大词型模具代表词',
+                  '十二种常用词型代表词',
                   WAZN_TEMPLATES.map((w) => {
                     const arWord = w.example.split(' ')[0]
                     return { ar: arWord, tr: w.tr, zh: `[${w.role}] ${w.example}` }
@@ -741,9 +752,59 @@ export function RootExplorer({ onPracticeWords }: Props) {
                 )
               }
             >
-              <IconKeyboard size={15} /> 打字练习模具代表词
+              <IconKeyboard size={15} /> 打字练习 12 词型代表词
             </button>
           </div>
+
+          {/* Interactive Root x Wazn Forge */}
+          <div className="glass" style={{ padding: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+              <div>
+                <b>三母词根 × 词型推演台：将词根「{selRoot.display}（{selRoot.coreMeaning}）」套入不同词型</b>
+                <p className="muted" style={{ margin: '2px 0 0', fontSize: 13 }}>
+                  切换词根，观察 ف (<b>{selRoot.letters[0]}</b>) · ع (<b>{selRoot.letters[1]}</b>) · ل (<b>{selRoot.letters[2]}</b>) 如何按词型规则派生词汇：
+                </p>
+              </div>
+              <div className="verb-lab__picks">
+                {ROOT_FAMILIES.slice(0, 8).map((r) => (
+                  <button
+                    key={r.id}
+                    className={'btn btn--sm ' + (selRoot.id === r.id ? 'btn--gold' : 'btn--ghost')}
+                    onClick={() => setSelRoot(r)}
+                  >
+                    <span className="ar">{r.display}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="derived-grid" style={{ marginTop: 14 }}>
+              {selRoot.words.map((w) => {
+                const pron = formatPronunciation(w.tr)
+                return (
+                  <button key={w.ar} className="derived-card" onClick={() => speak(w.ar)}>
+                    <div className="derived-card__top">
+                      <span className="xray-token__badge">{w.waznRole}</span>
+                      <span className="ar gold-text" style={{ fontSize: 18 }}>
+                        {w.wazn}
+                      </span>
+                    </div>
+                    <div className="derived-card__ar ar">{w.ar}</div>
+                    <div className="word-tr" style={{ fontSize: 15 }}>
+                      {pron.syllables}
+                    </div>
+                    <small className="muted" style={{ fontSize: 12 }}>
+                      谐音：{pron.zhPhonetic}
+                    </small>
+                    <div className="derived-card__zh">
+                      <b>{w.zh}</b>
+                      <IconVolume size={15} />
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
           <div className="wazn-grid">
             {WAZN_TEMPLATES.map((w) => {
               const sampleAr = w.example.split(' ')[0]

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 import type { Word } from '../data/words'
 import { clusterText, isMark, shuffle, toClusters } from '../lib/arabic'
 import { charsFromEvent, KEY_FOR_CHAR, MARK_NAMES } from '../lib/keyboard'
-import { hasArabicVoice, sfx, speak } from '../lib/audio'
+import { formatPronunciation, sfx, speak } from '../lib/audio'
 import type { SessionRecord, Settings } from '../lib/storage'
 import { Keyboard } from './Keyboard'
 import { IconArrowLeft, IconArrowRight, IconRefresh, IconTrophy, IconVolume } from './Icons'
@@ -336,15 +336,47 @@ export function TypingPractice({ title, words, settings, setSettings, onMistake,
               )
             })}
           </div>
-          {settings.showTranslit && revealed && <div className="word-tr">{word.tr}</div>}
+          {settings.showTranslit && revealed && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+              <div className="word-tr">{word.tr}</div>
+              {(() => {
+                const p = formatPronunciation(word.tr)
+                return (
+                  <small className="muted" style={{ fontSize: 13 }}>
+                    音节：<b>{p.syllables}</b> {p.zhHint ? `· 谐音助记：【${p.zhHint}】` : ''}
+                  </small>
+                )
+              })()}
+            </div>
+          )}
           <div className="word-zh">{word.zh}</div>
           <div className="word-tools">
-            <button id="btn-speak" className="icon-btn" aria-label="朗读单词 (Enter)" title="朗读 (Enter)" onClick={(e) => { speak(word.ar); e.currentTarget.blur() }}>
-              <IconVolume size={18} />
+            <button
+              id="btn-speak"
+              className="btn btn--ghost btn--sm"
+              aria-label="标准语速朗读单词 (Enter)"
+              title="标准语速朗读 (Enter)"
+              onClick={(e) => {
+                speak(word.ar)
+                e.currentTarget.blur()
+              }}
+            >
+              <IconVolume size={16} /> 朗读 (Enter)
+            </button>
+            <button
+              id="btn-speak-slow"
+              className="btn btn--ghost btn--sm"
+              aria-label="慢速跟读单词 (0.55x)"
+              title="0.55x 慢速清晰跟读"
+              onClick={(e) => {
+                speak(word.ar, 0.55)
+                e.currentTarget.blur()
+              }}
+            >
+              <IconVolume size={15} /> 0.55x 慢读
             </button>
             {expected && isMark(expected) && <span className="mark-hint">下一个：{MARK_NAMES[expected]}</span>}
           </div>
-          {!hasArabicVoice() && <p className="warn">未检测到阿语语音。macOS 可在「系统设置 → 辅助功能 → 朗读内容 → 系统声音」中添加 Arabic 语音。</p>}
         </div>
 
         <div className="stage__side stage__side--next">

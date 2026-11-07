@@ -4,7 +4,7 @@ import { ALL_WORDS, CHAPTERS } from './data/words'
 import type { Word } from './data/words'
 import type { CourseLesson, LessonSentence } from './data/grammar'
 import { shuffle, stripMarks } from './lib/arabic'
-import { speak } from './lib/audio'
+import { formatPronunciation, getVoiceRate, setVoiceRate, speak } from './lib/audio'
 import { DEFAULT_SETTINGS, useStored, useStoredList } from './lib/storage'
 import type { MistakeBook, SessionRecord } from './lib/storage'
 import { TypingPractice } from './components/TypingPractice'
@@ -24,6 +24,7 @@ import {
   IconRefresh,
   IconSparkles,
   IconSun,
+  IconVolume,
 } from './components/Icons'
 
 type Tab = 'course' | 'roots' | 'typing' | 'letters' | 'mistakes' | 'stats'
@@ -48,6 +49,8 @@ export default function App() {
   const [sessions, setSessions] = useStoredList<SessionRecord>('qalam.sessions')
   const [lessonScores, setLessonScores] = useStored<Record<string, number>>('qalam.lessons', {})
   const [wordQuery, setWordQuery] = useState('')
+  const [previewChap, setPreviewChap] = useState<number | null>(null)
+  const [voiceRate, setRateState] = useState<number>(() => getVoiceRate())
   const [theme, setTheme] = useState<'night' | 'light' | 'emerald'>(() => {
     const saved = localStorage.getItem('qalam.theme')
     if (saved === 'light' || saved === 'emerald' || saved === 'night') return saved
@@ -130,46 +133,77 @@ export default function App() {
           ))}
         </nav>
 
-        <div className="theme-switcher" role="group" aria-label="配色主题切换">
-          <button
-            id="btn-theme-night"
-            className={'theme-pill' + (theme === 'night' ? ' is-on' : '')}
-            title="星夜蓝金 · Arabian Nights"
-            aria-label="切换为星夜蓝金配色"
-            onClick={(e) => {
-              setTheme('night')
-              e.currentTarget.blur()
-            }}
-          >
-            <IconMoon size={14} />
-            <span>星夜</span>
-          </button>
-          <button
-            id="btn-theme-light"
-            className={'theme-pill' + (theme === 'light' ? ' is-on' : '')}
-            title="羊皮纸墨香 · Andalusian Daylight"
-            aria-label="切换为羊皮纸浅色配色"
-            onClick={(e) => {
-              setTheme('light')
-              e.currentTarget.blur()
-            }}
-          >
-            <IconSun size={14} />
-            <span>浅色</span>
-          </button>
-          <button
-            id="btn-theme-emerald"
-            className={'theme-pill' + (theme === 'emerald' ? ' is-on' : '')}
-            title="翡翠流金 · Oasis Emerald"
-            aria-label="切换为翡翠流金配色"
-            onClick={(e) => {
-              setTheme('emerald')
-              e.currentTarget.blur()
-            }}
-          >
-            <IconSparkles size={14} />
-            <span>翡翠</span>
-          </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <div className="theme-switcher" role="group" aria-label="语音语速控制">
+            <button
+              className="theme-pill"
+              title="点击试听阿语发音（云端+本地双引擎）"
+              onClick={() => speak('مَرْحَبًا بِكَ فِي قَلَم')}
+            >
+              <IconVolume size={14} />
+              <span>发音</span>
+            </button>
+            {[
+              { r: 0.6, label: '0.6x' },
+              { r: 0.85, label: '0.85x' },
+              { r: 1.0, label: '1.0x' },
+            ].map((item) => (
+              <button
+                key={item.r}
+                className={'theme-pill' + (Math.abs(voiceRate - item.r) < 0.05 ? ' is-on' : '')}
+                title={`切换发音语速为 ${item.label}`}
+                onClick={() => {
+                  setRateState(item.r)
+                  setVoiceRate(item.r)
+                  speak('مَرْحَبًا', item.r)
+                }}
+              >
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="theme-switcher" role="group" aria-label="配色主题切换">
+            <button
+              id="btn-theme-night"
+              className={'theme-pill' + (theme === 'night' ? ' is-on' : '')}
+              title="星夜蓝金 · Arabian Nights"
+              aria-label="切换为星夜蓝金配色"
+              onClick={(e) => {
+                setTheme('night')
+                e.currentTarget.blur()
+              }}
+            >
+              <IconMoon size={14} />
+              <span>星夜</span>
+            </button>
+            <button
+              id="btn-theme-light"
+              className={'theme-pill' + (theme === 'light' ? ' is-on' : '')}
+              title="羊皮纸墨香 · Andalusian Daylight"
+              aria-label="切换为羊皮纸浅色配色"
+              onClick={(e) => {
+                setTheme('light')
+                e.currentTarget.blur()
+              }}
+            >
+              <IconSun size={14} />
+              <span>浅色</span>
+            </button>
+            <button
+              id="btn-theme-emerald"
+              className={'theme-pill' + (theme === 'emerald' ? ' is-on' : '')}
+              title="翡翠流金 · Oasis Emerald"
+              aria-label="切换为翡翠流金配色"
+              onClick={(e) => {
+                setTheme('emerald')
+                e.currentTarget.blur()
+              }}
+            >
+              <IconSparkles size={14} />
+              <span>翡翠</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -309,41 +343,108 @@ export default function App() {
                         )}
                       </div>
                       <div className="vocab-grid">
-                        {matches.slice(0, 60).map((w, idx) => (
-                          <button key={`${w.ar}-${idx}`} className="vocab-item glass" onClick={() => speak(w.ar)}>
-                            <span className="vocab-item__ar ar">{w.ar}</span>
-                            <span className="word-tr" style={{ fontSize: 13 }}>
-                              {w.tr}
-                            </span>
-                            <b>{w.zh}</b>
-                          </button>
-                        ))}
+                        {matches.slice(0, 60).map((w, idx) => {
+                          const p = formatPronunciation(w.tr)
+                          return (
+                            <button key={`${w.ar}-${idx}`} className="vocab-item glass" onClick={() => speak(w.ar)} title="点击听发音">
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span className="vocab-item__ar ar">{w.ar}</span>
+                                <IconVolume size={14} style={{ color: 'var(--gold)' }} />
+                              </div>
+                              <span className="word-tr" style={{ fontSize: 13 }}>
+                                {w.tr}
+                              </span>
+                              <small className="muted" style={{ fontSize: 11 }}>
+                                {p.syllables} {p.zhHint ? `· 【${p.zhHint}】` : ''}
+                              </small>
+                              <b>{w.zh}</b>
+                            </button>
+                          )
+                        })}
                       </div>
                     </div>
                   )
                 })()
               ) : null}
 
-              <h2 className="section-title">{CHAPTERS.length} 大主题章节（共 {ALL_WORDS.length + 28} 词）</h2>
+              {previewChap != null && CHAPTERS[previewChap] && (
+                <div className="glass" style={{ padding: 22, marginBottom: 24 }}>
+                  <div className="lesson-sec-head" style={{ marginTop: 0, marginBottom: 14 }}>
+                    <div>
+                      <span className="chip chip--on">章节有声词表预览</span>
+                      <h2 style={{ marginTop: 6 }}>
+                        {CHAPTERS[previewChap].title} · <span className="ar gold-text">{CHAPTERS[previewChap].titleAr}</span>（共 {CHAPTERS[previewChap].words.length} 词）
+                      </h2>
+                      <small className="muted">点击任意单词即可听取标准阿语发音，并查看音节拆解与中文谐音助记</small>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button className="btn btn--gold btn--sm" onClick={() => startChapter(previewChap)}>
+                        <IconKeyboard size={15} /> 开始本章盲打
+                      </button>
+                      <button className="btn btn--ghost btn--sm" onClick={() => setPreviewChap(null)}>
+                        收起词表
+                      </button>
+                    </div>
+                  </div>
+                  <div className="vocab-grid">
+                    {CHAPTERS[previewChap].words.map((w, idx) => {
+                      const p = formatPronunciation(w.tr)
+                      return (
+                        <button key={`${w.ar}-${idx}`} className="vocab-item glass" onClick={() => speak(w.ar)} title="点击听发音">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span className="vocab-item__ar ar">{w.ar}</span>
+                            <IconVolume size={14} style={{ color: 'var(--gold)' }} />
+                          </div>
+                          <span className="word-tr" style={{ fontSize: 13 }}>
+                            {w.tr}
+                          </span>
+                          <small className="muted" style={{ fontSize: 11 }}>
+                            {p.syllables} {p.zhHint ? `· 【${p.zhHint}】` : ''}
+                          </small>
+                          <b>{w.zh}</b>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <h2 className="section-title">{CHAPTERS.length} 大主题章节（共 {ALL_WORDS.length + 28} 词 · 点击卡片盲打或点「有声词表」听发音）</h2>
               <div className="chapters">
                 {CHAPTERS.map((c, i) => {
                   const best = bestByTitle.get(c.title)
                   return (
-                    <button
+                    <div
                       id={`chapter-${c.id}`}
                       key={c.id}
                       className="chapter glass"
-                      onClick={() => startChapter(i)}
-                      style={{ animationDelay: `${i * 35}ms` }}
+                      style={{ animationDelay: `${i * 35}ms`, cursor: 'default' }}
                     >
-                      <span className="chapter__num">CH.{String(i + 1).padStart(2, '0')}</span>
-                      <span className="chapter__ar ar">{c.titleAr}</span>
-                      <b>{c.title}</b>
-                      <small className="muted">
-                        {c.words.length} 个{i === 0 ? '字母' : '词'}
-                      </small>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                        <span className="chapter__num">CH.{String(i + 1).padStart(2, '0')}</span>
+                        <button
+                          className="chip"
+                          style={{ padding: '2px 8px', fontSize: 11 }}
+                          onClick={() => {
+                            setPreviewChap(previewChap === i ? null : i)
+                            speak(c.titleAr)
+                          }}
+                        >
+                          <IconVolume size={12} /> 有声词表
+                        </button>
+                      </div>
+                      <button
+                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', width: '100%', textAlign: 'left', gap: 4 }}
+                        onClick={() => startChapter(i)}
+                      >
+                        <span className="chapter__ar ar">{c.titleAr}</span>
+                        <b>{c.title}</b>
+                        <small className="muted">
+                          {c.words.length} 个{i === 0 ? '字母' : '词'} · 点击开始盲打
+                        </small>
+                      </button>
                       {best != null && <span className="chapter__best">最佳 {best}%</span>}
-                    </button>
+                    </div>
                   )
                 })}
               </div>

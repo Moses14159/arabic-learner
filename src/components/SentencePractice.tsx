@@ -3,7 +3,7 @@ import type { LessonSentence, WordToken } from '../data/grammar'
 import { ALL_SENTENCES, caseTypeForToken } from '../data/grammar'
 import { clusterText, isMark, shuffle, toClusters } from '../lib/arabic'
 import { charsFromEvent, KEY_FOR_CHAR, MARK_NAMES } from '../lib/keyboard'
-import { sfx, speak } from '../lib/audio'
+import { formatPronunciation, sfx, speak } from '../lib/audio'
 import type { Settings } from '../lib/storage'
 import { Keyboard } from './Keyboard'
 import {
@@ -319,9 +319,14 @@ export function SentencePractice({ title, sentences, settings, setSettings, onCo
       <div className="sentence-stage glass">
         <div className="sentence-prompt">
           <span className="sentence-prompt__zh">{current.zh}</span>
-          <button className="icon-btn" aria-label="朗读整句 (Enter)" title="朗读整句 (Enter)" onClick={() => speak(current.ar)}>
-            <IconVolume size={18} />
-          </button>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <button className="btn btn--ghost btn--sm" title="0.55x 慢速朗读整句" onClick={() => speak(current.ar, 0.55)}>
+              0.55x 慢读
+            </button>
+            <button className="icon-btn" aria-label="朗读整句 (Enter)" title="朗读整句 (Enter)" onClick={() => speak(current.ar)}>
+              <IconVolume size={18} />
+            </button>
+          </div>
         </div>
 
         {mode === 'build' ? (
@@ -479,9 +484,17 @@ export function SentencePractice({ title, sentences, settings, setSettings, onCo
                 </button>
                 <div>
                   <div>
-                    <b>{activeToken.zh}</b> ({activeToken.tr}) · <span className="gold-text">{activeToken.role}</span>
+                    <b>{activeToken.zh}</b> ({activeToken.tr} · 音节：<span className="gold-text">{formatPronunciation(activeToken.tr).syllables}</span> · 谐音：【{formatPronunciation(activeToken.tr).zhPhonetic}】) · <span className="gold-text">{activeToken.role}</span>
                   </div>
                   {activeToken.note && <p className="muted" style={{ margin: '4px 0 0' }}>解析：{activeToken.note}</p>}
+                </div>
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <button className="btn btn--ghost btn--sm" onClick={() => speak(activeToken.ar, 0.55)}>
+                    0.55x 慢读
+                  </button>
+                  <button className="icon-btn" aria-label="朗读单词" onClick={() => speak(activeToken.ar)}>
+                    <IconVolume size={18} />
+                  </button>
                 </div>
               </div>
             )}
