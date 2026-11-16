@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ALL_WORDS, CHAPTERS } from './data/words'
 import type { Word } from './data/words'
@@ -7,11 +7,6 @@ import { shuffle, stripMarks } from './lib/arabic'
 import { formatPronunciation, getVoiceRate, setVoiceRate, speak } from './lib/audio'
 import { DEFAULT_SETTINGS, useStored, useStoredList } from './lib/storage'
 import type { MistakeBook, SessionRecord } from './lib/storage'
-import { TypingPractice } from './components/TypingPractice'
-import { SentencePractice } from './components/SentencePractice'
-import { CourseMap } from './components/CourseMap'
-import { RootExplorer } from './components/RootExplorer'
-import { Letters } from './components/Letters'
 import { Mistakes, Stats } from './components/Panels'
 import {
   IconBook,
@@ -27,21 +22,30 @@ import {
   IconVolume,
 } from './components/Icons'
 
+const TypingPractice = lazy(() => import('./components/TypingPractice').then((module) => ({ default: module.TypingPractice })))
+const SentencePractice = lazy(() => import('./components/SentencePractice').then((module) => ({ default: module.SentencePractice })))
+const CourseMap = lazy(() => import('./components/CourseMap').then((module) => ({ default: module.CourseMap })))
+const RootExplorer = lazy(() => import('./components/RootExplorer').then((module) => ({ default: module.RootExplorer })))
+const Letters = lazy(() => import('./components/Letters').then((module) => ({ default: module.Letters })))
+
 type Tab = 'course' | 'roots' | 'typing' | 'letters' | 'mistakes' | 'stats'
-type Practice = { title: string; words: Word[]; chapter?: number; id: number } | null
+type Practice = { title: string; words: Word[]; chapter?: number; returnToLesson?: string; id: number } | null
 type SentenceJob = { lessonId: string; title: string; sentences: LessonSentence[]; id: number } | null
 
 const TABS: { id: Tab; label: string; ar: string; icon: ReactNode }[] = [
-  { id: 'course', label: '零到一课程', ar: 'مَنْهَج', icon: <IconCompass size={16} /> },
+  { id: 'course', label: '学习路线', ar: 'مَنْهَج', icon: <IconCompass size={16} /> },
   { id: 'roots', label: '词根与变位', ar: 'جُذُور', icon: <IconGitBranch size={16} /> },
   { id: 'typing', label: '词库打字', ar: 'كَلِمَات', icon: <IconKeyboard size={16} /> },
   { id: 'letters', label: '字母与拼读', ar: 'حُرُوف', icon: <IconBook size={16} /> },
   { id: 'mistakes', label: '错题本', ar: 'أَخْطَاء', icon: <IconBookmark size={16} /> },
-  { id: 'stats', label: '统计', ar: 'إِحْصَاء', icon: <IconChart size={16} /> },
+  { id: 'stats', label: '学习记录', ar: 'إِحْصَاء', icon: <IconChart size={16} /> },
 ]
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('course')
+  const [activeLessonId, setActiveLessonId] = useState<string | null>(null)
+  const [lessonStep, setLessonStep] = useState<1 | 2 | 3 | 4>(1)
+  const [independentScores, setIndependentScores] = useStored<Record<string, number>>('qalam.independent-lessons.v1', {})
   const [practice, setPractice] = useState<Practice>(null)
   const [sentenceJob, setSentenceJob] = useState<SentenceJob>(null)
   const [settings, setSettings] = useStored('qalam.settings', DEFAULT_SETTINGS)
@@ -54,7 +58,7 @@ export default function App() {
   const [theme, setTheme] = useState<'night' | 'light' | 'emerald'>(() => {
     const saved = localStorage.getItem('qalam.theme')
     if (saved === 'light' || saved === 'emerald' || saved === 'night') return saved
-    return 'night'
+    return 'light'
   })
 
   useEffect(() => {
@@ -72,11 +76,12 @@ export default function App() {
   }
 
   const startCustomTyping = (title: string, words: Word[]) => {
-    setPractice({ title, words, id: Date.now() })
+    setPractice({ title, words, returnToLesson: tab === 'course' ? activeLessonId ?? undefined : undefined, id: Date.now() })
     setTab('typing')
   }
 
   const startLessonSentences = (lesson: CourseLesson, sentences: LessonSentence[]) => {
+    setActiveLessonId(lesson.id)
     setSentenceJob({ lessonId: lesson.id, title: `${lesson.number} · ${lesson.title}`, sentences, id: Date.now() })
     setTab('course')
   }
@@ -87,13 +92,15 @@ export default function App() {
   return (
     <div className="app">
       <div className="bg-pattern" aria-hidden="true" />
-      <header className="header">
+      <a className="skip-link" href="#main-content">跳到学习内容</a>
+      <header className="header app-sidebar">
         <button
           id="logo"
           className="logo"
           aria-label="回到首页零到一课程"
           onClick={() => {
             setTab('course')
+            setActiveLessonId(null)
             setPractice(null)
             setSentenceJob(null)
           }}
@@ -105,6 +112,7 @@ export default function App() {
           </span>
         </button>
 
+        <span className="sidebar-caption">你的阿语学习空间</span>
         <nav className="tabs" aria-label="主导航">
           {TABS.map((t) => (
             <button
@@ -112,11 +120,10 @@ export default function App() {
               key={t.id}
               aria-current={tab === t.id ? 'page' : undefined}
               className={'tab' + (tab === t.id ? ' tab--on' : '')}
-              onClick={(e) => {
+              onClick={() => {
                 setTab(t.id)
-                if (t.id === 'course') setSentenceJob(null)
+                if (t.id === 'course') { setSentenceJob(null); setActiveLessonId(null) }
                 if (t.id === 'typing') setPractice(null)
-                e.currentTarget.blur()
               }}
             >
               <span className="tab__top">
@@ -133,11 +140,11 @@ export default function App() {
           ))}
         </nav>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <div className="header-tools">
           <div className="theme-switcher" role="group" aria-label="语音语速控制">
             <button
               className="theme-pill"
-              title="点击试听阿语发音（云端+本地双引擎）"
+              title="试听阿语发音"
               onClick={() => speak('مَرْحَبًا بِكَ فِي قَلَم')}
             >
               <IconVolume size={14} />
@@ -150,6 +157,7 @@ export default function App() {
             ].map((item) => (
               <button
                 key={item.r}
+                aria-pressed={Math.abs(voiceRate - item.r) < 0.05}
                 className={'theme-pill' + (Math.abs(voiceRate - item.r) < 0.05 ? ' is-on' : '')}
                 title={`切换发音语速为 ${item.label}`}
                 onClick={() => {
@@ -166,12 +174,12 @@ export default function App() {
           <div className="theme-switcher" role="group" aria-label="配色主题切换">
             <button
               id="btn-theme-night"
+              aria-pressed={theme === 'night'}
               className={'theme-pill' + (theme === 'night' ? ' is-on' : '')}
               title="星夜蓝金 · Arabian Nights"
               aria-label="切换为星夜蓝金配色"
-              onClick={(e) => {
+              onClick={() => {
                 setTheme('night')
-                e.currentTarget.blur()
               }}
             >
               <IconMoon size={14} />
@@ -179,12 +187,12 @@ export default function App() {
             </button>
             <button
               id="btn-theme-light"
+              aria-pressed={theme === 'light'}
               className={'theme-pill' + (theme === 'light' ? ' is-on' : '')}
               title="羊皮纸墨香 · Andalusian Daylight"
               aria-label="切换为羊皮纸浅色配色"
-              onClick={(e) => {
+              onClick={() => {
                 setTheme('light')
-                e.currentTarget.blur()
               }}
             >
               <IconSun size={14} />
@@ -192,12 +200,12 @@ export default function App() {
             </button>
             <button
               id="btn-theme-emerald"
+              aria-pressed={theme === 'emerald'}
               className={'theme-pill' + (theme === 'emerald' ? ' is-on' : '')}
               title="翡翠流金 · Oasis Emerald"
               aria-label="切换为翡翠流金配色"
-              onClick={(e) => {
+              onClick={() => {
                 setTheme('emerald')
-                e.currentTarget.blur()
               }}
             >
               <IconSparkles size={14} />
@@ -207,7 +215,8 @@ export default function App() {
         </div>
       </header>
 
-      <main className="main">
+      <main className="main" id="main-content" tabIndex={-1}>
+        <Suspense fallback={<p role="status" className="muted">正在打开学习内容…</p>}>
         {tab === 'course' &&
           (sentenceJob ? (
             <SentencePractice
@@ -216,28 +225,28 @@ export default function App() {
               sentences={sentenceJob.sentences}
               settings={settings}
               setSettings={setSettings}
-              onComplete={(acc) => {
-                setLessonScores((prev) => ({
-                  ...prev,
-                  [sentenceJob.lessonId]: Math.max(prev[sentenceJob.lessonId] ?? 0, acc),
-                }))
-                setSessions((s) => [
-                  ...s,
-                  {
-                    at: Date.now(),
-                    title: sentenceJob.title,
-                    words: sentenceJob.sentences.length * 4,
-                    seconds: 60,
-                    accuracy: acc,
-                    wpm: 15,
-                  },
-                ])
+              onComplete={(record) => {
+                if (!record.assisted) {
+                  setIndependentScores((prev) => ({ ...prev, [sentenceJob.lessonId]: Math.max(prev[sentenceJob.lessonId] ?? 0, record.accuracy) }))
+                  setLessonScores((prev) => ({
+                    ...prev,
+                    [sentenceJob.lessonId]: Math.max(prev[sentenceJob.lessonId] ?? 0, record.accuracy),
+                  }))
+                }
+                setSessions((s) => [...s, { ...record, lessonId: sentenceJob.lessonId }].slice(-500))
               }}
               onBack={() => setSentenceJob(null)}
             />
           ) : (
             <CourseMap
               lessonScores={lessonScores}
+              independentScores={independentScores}
+              step={lessonStep}
+              setStep={setLessonStep}
+              sessions={sessions}
+              mistakeCount={Object.keys(book).length}
+              activeLessonId={activeLessonId}
+              onSelectLesson={setActiveLessonId}
               onStartWordTyping={startCustomTyping}
               onStartSentencePractice={startLessonSentences}
               onJumpTab={(target) => setTab(target)}
@@ -256,7 +265,13 @@ export default function App() {
               setSettings={setSettings}
               onMistake={recordMistake}
               onSession={(r) => setSessions((s) => [...s, r].slice(-500))}
-              onBack={() => setPractice(null)}
+              onBack={() => {
+                setPractice(null)
+                if (practice.returnToLesson) {
+                  setActiveLessonId(practice.returnToLesson)
+                  setTab('course')
+                }
+              }}
               onNext={
                 practice.chapter != null && practice.chapter < CHAPTERS.length - 1
                   ? () => startChapter(practice.chapter! + 1)
@@ -298,6 +313,7 @@ export default function App() {
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                   <input
                     type="search"
+                    aria-label="搜索词库"
                     value={wordQuery}
                     onChange={(e) => setWordQuery(e.target.value)}
                     placeholder="搜索中文 / 音标 / 阿语（如：学校、kitab、مسجد）…"
@@ -409,7 +425,7 @@ export default function App() {
                 </div>
               )}
 
-              <h2 className="section-title">{CHAPTERS.length} 大主题章节（共 {ALL_WORDS.length + 28} 词 · 点击卡片盲打或点「有声词表」听发音）</h2>
+              <h2 className="section-title">{CHAPTERS.length} 大主题章节（共 {CHAPTERS.reduce((sum, chapter) => sum + chapter.words.length, 0)} 词 · 点击卡片盲打或点「有声词表」听发音）</h2>
               <div className="chapters">
                 {CHAPTERS.map((c, i) => {
                   const best = bestByTitle.get(c.title)
@@ -462,9 +478,10 @@ export default function App() {
         )}
 
         {tab === 'stats' && <Stats sessions={sessions} onClear={() => setSessions([])} />}
+        </Suspense>
       </main>
       <footer className="footer muted">
-        Qalam · 融合 Earthworm 连词成句 + Qwerty Learner 肌肉记忆 + 麦地那阿语语法体系 · 数据仅存于本地
+        Qalam قَلَم · 一点一滴，读懂另一种语言。学习记录保存在当前浏览器。
       </footer>
     </div>
   )

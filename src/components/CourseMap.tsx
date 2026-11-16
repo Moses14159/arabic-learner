@@ -1,6 +1,9 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { COURSE_LESSONS, caseTypeForToken } from '../data/grammar'
 import type { CourseLesson, LessonSentence } from '../data/grammar'
+import { LEARNING_PATH, LEARNING_STAGES, LEARNING_GOALS, pathForGoal, shortLessonTitle } from '../data/learningPath'
+import { useStored } from '../lib/storage'
+import type { SessionRecord } from '../lib/storage'
 import { LESSON_FUN_GUIDES } from '../data/funGuide'
 import type { Word } from '../data/words'
 import { shuffle } from '../lib/arabic'
@@ -20,11 +23,20 @@ import {
   IconVolume,
 } from './Icons'
 
+const Tajweed = lazy(() => import('./Tajweed').then((module) => ({ default: module.Tajweed })))
+
 interface Props {
   lessonScores: Record<string, number>
+  independentScores: Record<string, number>
+  step: 1 | 2 | 3 | 4
+  setStep: (step: 1 | 2 | 3 | 4) => void
+  sessions: SessionRecord[]
+  mistakeCount: number
+  activeLessonId: string | null
+  onSelectLesson: (id: string | null) => void
   onStartWordTyping: (title: string, words: Word[]) => void
   onStartSentencePractice: (lesson: CourseLesson, sentences: LessonSentence[]) => void
-  onJumpTab: (tab: 'letters' | 'roots') => void
+  onJumpTab: (tab: 'letters' | 'roots' | 'mistakes' | 'stats') => void
 }
 
 function VocabMiniGame({ vocab }: { vocab: Word[] }) {
@@ -63,7 +75,7 @@ function VocabMiniGame({ vocab }: { vocab: Word[] }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
         <div>
           <span className="chip chip--on">
-            <IconSparkles size={13} /> 盲打前热身 · 听音辨词小游戏 ({(qIdx % vocab.length) + 1}/{vocab.length})
+            <IconSparkles size={13} /> 词义热身 · 看词选义 ({(qIdx % vocab.length) + 1}/{vocab.length})
           </span>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
@@ -161,18 +173,30 @@ function VocabMiniGame({ vocab }: { vocab: Word[] }) {
   )
 }
 
-export function CourseMap({ lessonScores, onStartWordTyping, onStartSentencePractice, onJumpTab }: Props) {
-  const [active, setActive] = useState<CourseLesson | null>(null)
+export function CourseMap({ lessonScores, independentScores, step, setStep, sessions, mistakeCount, activeLessonId, onSelectLesson, onStartWordTyping, onStartSentencePractice, onJumpTab }: Props) {
+  const [goalPreference, setGoalPreference] = useStored<{ id: string }>('qalam.learning-goal', { id: 'daily' })
+  const goal = LEARNING_GOALS.find((item) => item.id === (goalPreference.id === 'reading' ? 'tajweed' : goalPreference.id)) ?? LEARNING_GOALS[0]
+  const recommendedPath = pathForGoal(goal.id)
+  const active = COURSE_LESSONS.find((lesson) => lesson.id === activeLessonId) ?? null
+  const [today] = useState(() => new Date())
+  const [pathFilter, setPathFilter] = useState<'foundation' | 'expression' | 'advanced' | 'all'>('foundation')
   const [viewMode, setViewMode] = useState<'guided' | 'all'>('guided')
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
   const [checkAnswers, setCheckAnswers] = useState<Record<number, number>>({})
 
-  const completedCount = COURSE_LESSONS.filter((l) => (lessonScores[l.id] ?? 0) > 0).length
-  const nextRecommended = COURSE_LESSONS.find((l) => !lessonScores[l.id]) ?? COURSE_LESSONS[0]
-  const progressPct = Math.round((completedCount / COURSE_LESSONS.length) * 100)
+  const practicedIds = new Set([
+    ...Object.keys(lessonScores),
+    ...Object.keys(independentScores),
+    ...sessions.filter((session) => session.lessonId).map((session) => session.lessonId!),
+  ])
+  const completedCount = LEARNING_PATH.filter((lesson) => practicedIds.has(lesson.id)).length
+  // Old scores used assisted answers and a different denominator; only new records guide advancement.
+  const passedIds = new Set(Object.keys(independentScores).filter((id) => independentScores[id] >= 80))
+  const nextRecommended = recommendedPath.find((lesson) => !passedIds.has(lesson.id)) ?? recommendedPath[0]
+  const progressPct = Math.round((completedCount / LEARNING_PATH.length) * 100)
+  const checkOptions = useMemo(() => active ? LESSON_FUN_GUIDES[active.id]?.miniChecks.map((check) => shuffle(check.options.map((text, index) => ({ text, index })))) ?? [] : [], [active])
 
   const openLesson = (lesson: CourseLesson) => {
-    setActive(lesson)
+    onSelectLesson(lesson.id)
     setStep(1)
     setCheckAnswers({})
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -181,9 +205,9 @@ export function CourseMap({ lessonScores, onStartWordTyping, onStartSentencePrac
   if (active) {
     const score = lessonScores[active.id]
     const fun = LESSON_FUN_GUIDES[active.id]
-    const activeIdx = COURSE_LESSONS.findIndex((l) => l.id === active.id)
-    const prevLesson = activeIdx > 0 ? COURSE_LESSONS[activeIdx - 1] : null
-    const nextLesson = activeIdx < COURSE_LESSONS.length - 1 ? COURSE_LESSONS[activeIdx + 1] : null
+    const activeIdx = recommendedPath.findIndex((l) => l.id === active.id)
+    const prevLesson = activeIdx > 0 ? recommendedPath[activeIdx - 1] : null
+    const nextLesson = activeIdx < recommendedPath.length - 1 ? recommendedPath[activeIdx + 1] : null
 
     const showStep1 = viewMode === 'all' || step === 1
     const showStep2 = viewMode === 'all' || step === 2
@@ -193,13 +217,13 @@ export function CourseMap({ lessonScores, onStartWordTyping, onStartSentencePrac
     return (
       <section className="lesson-view">
         <div className="practice__top" style={{ flexWrap: 'wrap', gap: 10 }}>
-          <button className="btn btn--ghost btn--sm" onClick={() => setActive(null)}>
-            <IconArrowLeft size={16} /> 返回零到一课程地图
+          <button className="btn btn--ghost btn--sm" onClick={() => onSelectLesson(null)}>
+            <IconArrowLeft size={16} /> 返回学习路线
           </button>
           <span className="chip chip--on">{active.stageTitle}</span>
           {score != null && (
             <span className="chapter__best">
-              <IconCheck size={14} /> 造句通关 {score}%
+              <IconCheck size={14} /> 历史练习最佳 {score}%
             </span>
           )}
           <div className="seg" style={{ marginLeft: 'auto' }} role="tablist" aria-label="教程浏览模式">
@@ -270,7 +294,7 @@ export function CourseMap({ lessonScores, onStartWordTyping, onStartSentencePrac
             {[
               { s: 1 as const, label: '第一步 · 概念导读与情景对话', sub: '脉络梳理 + 核心纲要' },
               { s: 2 as const, label: '第二步 · 语法详解与随堂自测', sub: `${active.points.length} 个语法要点 + 概念辨析` },
-              { s: 3 as const, label: '第三步 · 听音辨词与本课词汇', sub: `${active.vocab.length} 个有声词卡 + 听音练习` },
+              { s: 3 as const, label: '第三步 · 看词选义与本课词汇', sub: `${active.vocab.length} 个有声词卡 + 听音练习` },
               { s: 4 as const, label: '第四步 · 句法剖析与造句练习', sub: `${active.sentences.length} 句变格解析 + 键盘实操` },
             ].map((item) => {
               const isOn = step === item.s
@@ -475,7 +499,7 @@ export function CourseMap({ lessonScores, onStartWordTyping, onStartSentencePrac
                           Q{idx + 1}. {mc.question}
                         </div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                          {mc.options.map((opt, oIdx) => {
+                          {checkOptions[idx].map(({ text: opt, index: oIdx }) => {
                             const isPicked = chosen === oIdx
                             const isRight = oIdx === mc.correctIndex
                             let border = '1px solid var(--border)'
@@ -492,6 +516,7 @@ export function CourseMap({ lessonScores, onStartWordTyping, onStartSentencePrac
                             return (
                               <button
                                 key={oIdx}
+                                disabled={chosen !== undefined}
                                 onClick={() => {
                                   setCheckAnswers((prev) => ({ ...prev, [idx]: oIdx }))
                                   speak(mc.speakAr)
@@ -712,155 +737,97 @@ export function CourseMap({ lessonScores, onStartWordTyping, onStartSentencePrac
     )
   }
 
-  // Group lessons by stage
-  const stages = Array.from(new Set(COURSE_LESSONS.map((l) => l.stage))).map((st) => ({
-    stage: st,
-    title: COURSE_LESSONS.find((l) => l.stage === st)!.stageTitle,
-    lessons: COURSE_LESSONS.filter((l) => l.stage === st),
-  }))
+  const validSessions = sessions.filter((session) => session.kind && session.words > 0)
+  const todaySessions = validSessions.filter((session) => new Date(session.at).toDateString() === today.toDateString())
+  const week = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(today)
+    date.setDate(date.getDate() - 6 + index)
+    return {
+      label: ['日', '一', '二', '三', '四', '五', '六'][date.getDay()],
+      date: date.toLocaleDateString('zh-CN'),
+      active: validSessions.some((session) => new Date(session.at).toDateString() === date.toDateString()),
+    }
+  })
+  const stages = LEARNING_STAGES.filter((stage) => pathFilter === 'all' || (pathFilter === 'foundation' ? stage.index < 2 : pathFilter === 'expression' ? stage.index === 2 || stage.index === 3 : stage.index === 4))
 
   return (
-    <section className="home">
-      {/* Bento Grid Hero Dashboard */}
-      <div className="bento-hero">
-        <div className="bento-main glass">
-          <span className="chip chip--on">
-            <IconCompass size={14} /> 循序渐进 · 阿拉伯语系统课程
-          </span>
-          <h1>
-            从零到一学阿拉伯语
-            <span className="hero__ar ar">مِنَ الصِّفْرِ إِلَى الْإِتْقَانِ</span>
-          </h1>
-          <p className="muted">
-            以《麦地那阿拉伯语教程》全三册语法体系为脉络，从 <b>文字连写与动符导引</b>、<b>28 字母同形分组辨析</b> 出发，
-            结合情景对话、随堂概念自测、听音辨词与逐词句法剖析（الإِعْرَاب），扎实地掌握阿拉伯语词法与句法。
-          </p>
-          <div className="hero__actions">
-            <button className="btn btn--gold" onClick={() => openLesson(nextRecommended)}>
-              <IconSparkles size={17} />{' '}
-              {completedCount > 0 ? `继续学习：${nextRecommended.number} · ${nextRecommended.title}` : `从导引课开始：${COURSE_LESSONS[0].title}`}
-            </button>
-            <button className="btn" onClick={() => onJumpTab('letters')}>
-              <IconBook size={17} /> 28 字母分组与拼读
-            </button>
-            <button className="btn btn--ghost" onClick={() => onJumpTab('roots')}>
-              <IconGitBranch size={17} /> 词根与词法工坊
-            </button>
-          </div>
+    <section className="home learning-home">
+      <div className="dashboard-heading">
+        <div>
+          <span className="eyebrow">YOUR ARABIC JOURNEY · 你的阿语之旅</span>
+          <h1>{todaySessions.length ? '今天，也向前了一点。' : '每天一点，离阿语更近一点。'}</h1>
+          <p className="muted">从一句问候开始，让每次练习都有收获。</p>
         </div>
-
-        <div className="bento-side">
-          <div className="bento-card glass">
-            <div className="bento-card__top">
-              <span className="muted">课程学习进度</span>
-              <b className="gold-text">
-                {completedCount} / {COURSE_LESSONS.length} 课
-              </b>
-            </div>
-            <div className="progress" style={{ height: 8, margin: '8px 0' }}>
-              <div className="progress__fill" style={{ width: `${progressPct}%` }} />
-            </div>
-            <p className="muted" style={{ fontSize: 13, margin: 0 }}>
-              每课包含：概念导读与对话、语法讲义与随堂自测、有声词汇练习、逐词格位解析与造句。
-            </p>
-          </div>
-
-          <button className="bento-card bento-card--action glass" onClick={() => openLesson(COURSE_LESSONS[0])}>
-            <div className="bento-card__icon">
-              <IconSparkles size={20} />
-            </div>
-            <div>
-              <b>导引第一课 · 文字连写与动符拼读</b>
-              <p className="muted">理清从右向左连写变形、开口/齐齿/合口三大动符，以及 6 个单向连写字母</p>
-            </div>
-            <IconArrowRight size={18} />
-          </button>
-
-          <button className="bento-card bento-card--action glass" onClick={() => onJumpTab('letters')}>
-            <div className="bento-card__icon">
-              <IconBook size={20} />
-            </div>
-            <div>
-              <b>同形骨架分组 · 28 字母与四形态</b>
-              <p className="muted">按 7 组同形骨架与发音部位对比记忆 28 个辅音字母，配连写拆解示例</p>
-            </div>
-            <IconArrowRight size={18} />
-          </button>
-        </div>
+        <span className="dashboard-date">{today.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })}</span>
       </div>
 
-      {stages.map((st) => (
-        <div key={st.stage} className="stage-block">
-          <h2 className="section-title">{st.title}</h2>
-          <div className="course-grid">
-            {st.lessons.map((lesson, idx) => {
-              const score = lessonScores[lesson.id]
-              const fun = LESSON_FUN_GUIDES[lesson.id]
-              return (
-                <article
-                  key={lesson.id}
-                  className="course-card glass"
-                  style={st.stage === 0 ? { borderColor: 'var(--border-gold)' } : undefined}
-                >
-                  <div className="course-card__head">
-                    <span className="course-card__icon ar" aria-hidden="true">
-                      {st.stage}.{idx + 1}
-                    </span>
-                    <div>
-                      <small className="gold-text">
-                        {lesson.number} · <span className="ar">{lesson.titleAr}</span>
-                      </small>
-                      <h3>{lesson.title}</h3>
-                    </div>
-                    {score != null && (
-                      <span className="chapter__best">
-                        <IconCheck size={13} /> {score}%
-                      </span>
-                    )}
-                  </div>
-                  <p className="muted course-card__desc">{lesson.subtitle}</p>
-                  {fun && (
-                    <div
-                      style={{
-                        fontSize: 12.5,
-                        padding: '8px 10px',
-                        borderRadius: 8,
-                        background: 'var(--gold-soft)',
-                        color: 'var(--gold)',
-                        fontWeight: 600,
-                      }}
-                    >
-                      {fun.mnemonic}
-                    </div>
-                  )}
-                  <div className="course-card__meta">
-                    <span>
-                      <IconBook size={13} /> {lesson.points.length} 个语法点
-                    </span>
-                    <span>
-                      <IconKeyboard size={13} /> {lesson.vocab.length} 个核心词
-                    </span>
-                    <span>
-                      <IconLayers size={13} /> {lesson.sentences.length} 个解剖句
-                    </span>
-                  </div>
-                  <div className="course-card__actions">
-                    <button className="btn btn--sm" onClick={() => openLesson(lesson)}>
-                      <IconBook size={15} /> 分步导学
-                    </button>
-                    <button
-                      className="btn btn--gold btn--sm"
-                      onClick={() => onStartSentencePractice(lesson, lesson.sentences)}
-                    >
-                      <IconPuzzle size={15} /> 造句练习
-                    </button>
-                  </div>
-                </article>
-              )
-            })}
+      <div className="goal-picker" role="group" aria-label="选择学习目标">
+        {LEARNING_GOALS.map((item) => <button key={item.id} aria-pressed={goal.id === item.id} className={goal.id === item.id ? 'is-active' : ''} onClick={() => setGoalPreference({ id: item.id })}><span>{item.title}</span><small>{item.subtitle}</small>{goal.id === item.id && <IconCheck size={16} />}</button>)}
+      </div>
+      <p className="goal-description">{goal.description}</p>
+      {goal.id === 'tajweed' ? <Suspense fallback={<p role="status">正在打开 Tajweed 规则…</p>}><Tajweed onLetters={() => onJumpTab('letters')} /></Suspense> : <>
+      <div className="learning-dashboard">
+        <section className="today-card">
+          <span className="eyebrow">{completedCount ? 'YOUR NEXT STEP · 下一步' : 'START SMALL · 从这里开始'}</span>
+          <h2>{shortLessonTitle(nextRecommended.title)}</h2>
+          <p className="today-description">{nextRecommended.subtitle}</p>
+          <div className="today-meta"><span><IconBook size={15} /> {nextRecommended.number}</span><span>{nextRecommended.vocab.length} 个词 · {nextRecommended.sentences.length} 句练习</span></div>
+          <div className="hero__actions">
+            <button className="btn btn--gold" onClick={() => openLesson(nextRecommended)}>{completedCount ? '继续这段旅程' : goal.id === 'daily' ? '开始第一课' : '开始推荐课程'} <IconArrowRight size={17} /></button>
+            <button className="btn btn--ghost" onClick={() => onJumpTab('letters')}>先认识字母</button>
           </div>
+          <div className="today-art" aria-hidden="true"><span className="ar">قَلَم</span><small>一支笔，一段新旅程</small></div>
+        </section>
+        <aside className="rhythm-card">
+          <div className="rhythm-card__head"><h2>找到你的学习节奏</h2><IconFlame size={20} /></div>
+          <div className="week-rhythm" aria-label="最近七天的练习记录">
+            {week.map((day, index) => <div key={day.date} className={'week-day' + (day.active ? ' is-active' : '') + (index === 6 ? ' is-today' : '')} aria-label={`${day.date}${day.active ? '，已练习' : '，暂无练习'}${index === 6 ? '，今天' : ''}`}><small>{day.label}</small><span>{day.active ? <IconCheck size={15} /> : index === 6 ? '今' : '·'}</span></div>)}
+          </div>
+          <div className="rhythm-summary"><strong>{week.filter((day) => day.active).length}<small> / 7 天</small></strong><span>最近一周有练习的日子</span></div>
+          <p className="muted">{todaySessions.length ? '今日小目标已完成。明天再试试不看提示回忆。' : '今天的小目标：完成一组练习。不赶进度，学会一点就很好。'}</p>
+        </aside>
+      </div>
+
+      <div className="learning-metrics">
+        <div><span>已练习单元</span><strong>{completedCount}<small> / {LEARNING_PATH.length}</small></strong><small>记录探索，不等同于掌握</small></div>
+        <div><span>今日完成</span><strong>{todaySessions.length}<small> 组练习</small></strong><small>从一组小练习开始</small></div>
+        <div><span>待巩固词汇</span><strong>{mistakeCount}<small> 个词</small></strong><small>{mistakeCount ? '回想一次，比再看一次更有帮助' : '练习中遇到的错词会留在这里'}</small></div>
+      </div>
+
+      <div className="learning-workspace">
+        <div className="course-path">
+          <div className="path-heading"><div><span className="eyebrow">THE LEARNING PATH</span><h2>你的学习路线</h2></div><p className="muted">先会用，再慢慢理解规律。</p></div>
+          <div className="stage-filter" role="group" aria-label="课程阶段筛选">
+            {([{ id: 'foundation', label: '入门基础' }, { id: 'expression', label: '日常表达' }, { id: 'advanced', label: '进阶选学' }, { id: 'all', label: '全部课程' }] as const).map((filter) => <button key={filter.id} aria-pressed={pathFilter === filter.id} className={pathFilter === filter.id ? 'is-active' : ''} onClick={() => setPathFilter(filter.id)}>{filter.label}</button>)}
+          </div>
+          {stages.map((stage) => (
+            <div key={stage.index} className="stage-block">
+              <div className="stage-heading"><span className="stage-number">{String(stage.index + 1).padStart(2, '0')}</span><div><h3>{stage.title}</h3><p>{stage.summary}</p></div></div>
+              <div className="course-grid">
+                {stage.lessons.map((lesson, index) => {
+                  const practiced = practicedIds.has(lesson.id)
+                  const isNext = lesson.id === nextRecommended.id
+                  return (
+                    <article key={lesson.id} className={'course-card glass' + (isNext ? ' is-next' : '') + (practiced ? ' is-practiced' : '')}>
+                      <div className="course-card__head"><span className="course-card__icon" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span><span className="lesson-status">{isNext ? '建议下一课' : practiced ? '已练习' : stage.index === 4 ? '选学专题' : lesson.number}</span></div>
+                      <h3>{shortLessonTitle(lesson.title)}</h3>
+                      <p className="muted course-card__desc">{lesson.subtitle}</p>
+                      <div className="course-card__meta"><span><IconBook size={13} /> {lesson.vocab.length} 个核心词</span><span><IconLayers size={13} /> {lesson.sentences.length} 句练习</span></div>
+                      <div className="course-card__actions"><button className={'btn btn--sm' + (isNext ? ' btn--gold' : '')} onClick={() => openLesson(lesson)}>{practiced ? '重温这一课' : '开始学习'} <IconArrowRight size={14} /></button><button className="btn btn--ghost btn--sm" onClick={() => onStartSentencePractice(lesson, lesson.sentences)}>造句练习</button></div>
+                    </article>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
+        <aside className="study-sidebar">
+          <section className="study-card review-card"><span className="eyebrow">A LITTLE REVIEW</span><IconSparkles size={24} /><h3>{mistakeCount ? '让模糊的词，变清晰。' : '学过的，值得再想一次。'}</h3><p>{mistakeCount ? `错题本里有 ${mistakeCount} 个词。试着先回想意思，再听一次发音。` : '今天学完，明天再来回想。遇到不会的词，也是在发现下一步。'}</p><button className="btn" onClick={() => mistakeCount ? onJumpTab('mistakes') : openLesson(nextRecommended)}>{mistakeCount ? '复习错词' : '开始积累第一个词'} <IconArrowRight size={15} /></button></section>
+          <section className="study-card"><span className="eyebrow">YOUR TOOLKIT</span><h3>需要时，来这里找找</h3><button className="resource-link" onClick={() => onJumpTab('letters')}><IconBook size={19} /><span>字母与拼读<small>听一听，认一认</small></span><IconArrowRight size={15} /></button><button className="resource-link" onClick={() => onJumpTab('roots')}><IconGitBranch size={19} /><span>词根与变位<small>发现词语的联系</small></span><IconArrowRight size={15} /></button><button className="resource-link" onClick={() => onJumpTab('stats')}><IconCompass size={19} /><span>学习记录<small>看看自己的积累</small></span><IconArrowRight size={15} /></button></section>
+          <section className="study-card"><span className="eyebrow">ONE STEP AT A TIME</span><h3>练习过，不等于记住了</h3><p>完成后，试着不看答案说一句。隔天还能想起来，才是更扎实的一步。</p><div className="progress" role="progressbar" aria-label="已练习单元比例" aria-valuenow={completedCount} aria-valuemin={0} aria-valuemax={LEARNING_PATH.length}><div className="progress__fill" style={{ width: `${progressPct}%` }} /></div><p className="muted">现代标准阿语入门与语法练习</p></section>
+        </aside>
+      </div>
+      </>}
     </section>
   )
 }

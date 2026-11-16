@@ -4,6 +4,7 @@ import { clusterText, isMark, shuffle, toClusters } from '../lib/arabic'
 import { charsFromEvent, KEY_FOR_CHAR, MARK_NAMES } from '../lib/keyboard'
 import { formatPronunciation, sfx, speak } from '../lib/audio'
 import type { SessionRecord, Settings } from '../lib/storage'
+import { sessionMetrics } from '../lib/session'
 import { Keyboard } from './Keyboard'
 import { IconArrowLeft, IconArrowRight, IconRefresh, IconTrophy, IconVolume } from './Icons'
 
@@ -29,6 +30,8 @@ interface Game {
   correct: number
   total: number
   done: number
+  skipped: number
+  assisted: boolean
   missed: Word[]
   locked: boolean
 }
@@ -44,6 +47,8 @@ const freshGame = (): Game => ({
   correct: 0,
   total: 0,
   done: 0,
+  skipped: 0,
+  assisted: false,
   missed: [],
   locked: false,
 })
@@ -62,14 +67,18 @@ export function TypingPractice({ title, words, settings, setSettings, onMistake,
   const [flash, setFlash] = useState(false)
   const [pressed, setPressed] = useState<{ code: string; ok: boolean } | null>(null)
   const pressTimer = useRef(0)
+  const advanceTimer = useRef(0)
+  const inputArea = useRef<HTMLDivElement>(null)
 
   const listRef = useRef(list)
   if (listRef.current !== list) {
+    clearTimeout(advanceTimer.current)
     listRef.current = list
     g.current = freshGame()
   }
 
   const s = g.current
+  if (!settings.dictation || settings.showKeyboard) s.assisted = true
   const finished = s.idx >= list.length
   const word = list[Math.min(s.idx, list.length - 1)]
   const clusters = useMemo(() => toClusters(word.ar), [word])
@@ -96,14 +105,14 @@ export function TypingPractice({ title, words, settings, setSettings, onMistake,
 
   const finishSession = () => {
     s.end = Date.now()
-    const seconds = Math.max(1, (s.end - s.start) / 1000)
     onSession({
-      at: Date.now(),
+      at: s.end,
       title,
       words: s.done,
-      seconds: Math.round(seconds),
-      accuracy: s.total ? Math.round((s.correct / s.total) * 100) : 100,
-      wpm: Math.round((s.done / seconds) * 60 * 10) / 10,
+      ...sessionMetrics(s.start, s.end, s.done, s.correct, s.total, s.done / list.length),
+      kind: 'typing',
+      assisted: s.assisted,
+      skipped: s.skipped,
     })
   }
 
@@ -169,7 +178,7 @@ export function TypingPractice({ title, words, settings, setSettings, onMistake,
         play('word')
         setFlash(true)
         showPress(code, true)
-        setTimeout(() => {
+        advanceTimer.current = window.setTimeout(() => {
           setFlash(false)
           advance()
         }, settings.dictation ? 900 : 380)
@@ -184,6 +193,8 @@ export function TypingPractice({ title, words, settings, setSettings, onMistake,
 
   const skip = () => {
     if (finished || s.locked) return
+    if (!s.start) s.start = Date.now()
+    s.skipped++
     if (!s.wordHadError) {
       s.missed.push(word)
       onMistake(word)
@@ -193,14 +204,16 @@ export function TypingPractice({ title, words, settings, setSettings, onMistake,
 
   const handler = useRef<(e: KeyboardEvent) => void>(() => {})
   handler.current = (e: KeyboardEvent) => {
-    if ((e.target as HTMLElement)?.closest?.('input,textarea,select')) return
+    const target = e.target as HTMLElement
+    if (target?.closest?.('input,textarea,select,[contenteditable="true"]')) return
+    if (target?.closest?.('button,a') && (e.key === 'Enter' || e.key === ' ')) return
     if (e.key === 'Enter') {
       e.preventDefault()
       if (finished) restart()
       else speak(word.ar)
       return
     }
-    if (e.key === 'Tab') {
+    if (e.key === 'ArrowRight') {
       e.preventDefault()
       skip()
       return
@@ -214,12 +227,17 @@ export function TypingPractice({ title, words, settings, setSettings, onMistake,
     const chars = charsFromEvent(e)
     if (chars == null) return
     e.preventDefault()
+    inputArea.current?.focus({ preventScroll: true })
     handleChars(chars, e.code)
   }
   useEffect(() => {
     const fn = (e: KeyboardEvent) => handler.current(e)
     window.addEventListener('keydown', fn)
-    return () => window.removeEventListener('keydown', fn)
+    return () => {
+      window.removeEventListener('keydown', fn)
+      clearTimeout(advanceTimer.current)
+      clearTimeout(pressTimer.current)
+    }
   }, [])
 
   const restart = (newSource?: Word[]) => {
@@ -232,7 +250,7 @@ export function TypingPractice({ title, words, settings, setSettings, onMistake,
   const expected = !cur ? null : !s.baseDone ? cur.base : s.marksLeft[0]
   const hint = expected ? (KEY_FOR_CHAR[expected] ?? null) : null
   const elapsed = s.start ? ((s.end || Date.now()) - s.start) / 1000 : 0
-  const accuracy = s.total ? Math.round((s.correct / s.total) * 100) : 100
+  const accuracy = sessionMetrics(s.start, s.end || Date.now(), s.done, s.correct, s.total, s.done / Math.max(1, s.idx + (s.locked ? 1 : 0))).accuracy
   const wpm = elapsed > 2 ? Math.round((s.done / elapsed) * 60 * 10) / 10 : 0
   const progress = (Math.min(s.idx, list.length) / list.length) * 100
   const revealed = flash || !settings.dictation
@@ -245,6 +263,7 @@ export function TypingPractice({ title, words, settings, setSettings, onMistake,
       aria-pressed={settings[k]}
       className={'chip' + (settings[k] ? ' chip--on' : '')}
       onClick={(e) => {
+        if (k === 'requireMarks') resetWord()
         setSettings((x) => ({ ...x, [k]: !x[k] }))
         e.currentTarget.blur()
       }}
@@ -261,13 +280,13 @@ export function TypingPractice({ title, words, settings, setSettings, onMistake,
           <div className="result__badge">
             <IconTrophy size={42} />
           </div>
-          <h2>本章完成：{title}</h2>
-          <p className="muted">أَحْسَنْتَ！(aḥsanta，干得好)</p>
+          <h2>本轮练习结束：{title}</h2>
+          <p className="muted">完成 {s.done} / {list.length} 个词{s.skipped > 0 ? `，跳过 ${s.skipped} 个；可以从下方复习。` : '，下次试试不看提示回忆。'}</p>
           <div className="result__stats">
             <div><b>{fmtTime(elapsed)}</b><span>用时</span></div>
             <div><b>{s.done}</b><span>单词</span></div>
             <div><b>{wpm}</b><span>词/分钟</span></div>
-            <div><b>{accuracy}%</b><span>正确率</span></div>
+            <div title="击键正确率 × 完成词占比；跳过不计正确"><b>{accuracy}%</b><span>正确率（含跳过）</span></div>
           </div>
           {uniqMissed.length > 0 && (
             <div className="result__missed">
@@ -312,7 +331,7 @@ export function TypingPractice({ title, words, settings, setSettings, onMistake,
           <div><b>{fmtTime(elapsed)}</b><span>时间</span></div>
           <div><b>{s.done}</b><span>完成</span></div>
           <div><b>{wpm}</b><span>WPM</span></div>
-          <div><b>{accuracy}%</b><span>正确率</span></div>
+          <div title="击键正确率 × 完成词占比；跳过不计正确"><b>{accuracy}%</b><span>正确率</span></div>
         </div>
       </div>
 
@@ -323,7 +342,7 @@ export function TypingPractice({ title, words, settings, setSettings, onMistake,
           {prevWord && <><span className="ar">{prevWord.ar}</span><small>{prevWord.zh}</small></>}
         </div>
 
-        <div className="stage__main">
+        <div className="stage__main" ref={inputArea} tabIndex={0} role="group" aria-label="阿语键盘输入区">
           <div key={shake} className={'word-ar ar' + (shake ? ' shake' : '') + (flash ? ' word-ar--done' : '')} dir="rtl">
             {clusters.map((c, i) => {
               const state = i < s.ci ? 'done' : i === s.ci ? (s.baseDone ? 'partial' : 'current') : 'todo'
@@ -351,6 +370,7 @@ export function TypingPractice({ title, words, settings, setSettings, onMistake,
           )}
           <div className="word-zh">{word.zh}</div>
           <div className="word-tools">
+            <button className="btn btn--ghost btn--sm" onClick={skip}>跳过此词 (→)</button>
             <button
               id="btn-speak"
               className="btn btn--ghost btn--sm"
@@ -395,10 +415,19 @@ export function TypingPractice({ title, words, settings, setSettings, onMistake,
         {toggle('showKeyboard', '键盘')}
       </div>
 
-      {settings.showKeyboard && <Keyboard hint={hint} pressed={pressed?.code ?? null} pressedOk={pressed?.ok ?? true} />}
+      {settings.showKeyboard && <Keyboard
+        hint={hint}
+        pressed={pressed?.code ?? null}
+        pressedOk={pressed?.ok ?? true}
+        onInput={handleChars}
+        onReset={() => { resetWord(); force() }}
+        onSpeak={() => speak(word.ar)}
+        onFocusInput={() => inputArea.current?.focus({ preventScroll: true })}
+      />}
 
       <p className="shortcuts">
-        <kbd>Enter</kbd> 朗读 · <kbd>Tab</kbd> 跳过 · <kbd>Esc</kbd> 重打本词 · 直接用英文键盘打字，按键位置对应标准阿语键盘
+        点击屏幕键盘即可输入；<kbd>Shift</kbd> 输入一次上档字符或动符。<br />
+        <kbd>Enter</kbd> 朗读 · <kbd>→</kbd> 跳过 · <kbd>Esc</kbd> 重打本词 · <kbd>Tab</kbd> 切换按钮 · 也可用英文键盘打字
       </p>
     </section>
   )

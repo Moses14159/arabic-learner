@@ -21,7 +21,8 @@ export function useStoredList<T>(key: string) {
   const [value, setValue] = useState<T[]>(() => {
     try {
       const raw = localStorage.getItem(key)
-      return raw ? (JSON.parse(raw) as T[]) : []
+      const parsed: unknown = raw ? JSON.parse(raw) : []
+      return Array.isArray(parsed) ? (parsed as T[]) : []
     } catch {
       return []
     }
@@ -67,4 +68,8 @@ export interface SessionRecord {
   seconds: number
   accuracy: number
   wpm: number
+  kind?: 'typing' | 'sentence'
+  assisted?: boolean
+  lessonId?: string
+  skipped?: number
 }
