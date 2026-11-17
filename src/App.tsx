@@ -8,6 +8,8 @@ import { formatPronunciation, getVoiceRate, setVoiceRate, speak } from './lib/au
 import { DEFAULT_SETTINGS, useStored, useStoredList } from './lib/storage'
 import type { MistakeBook, SessionRecord } from './lib/storage'
 import { Mistakes, Stats } from './components/Panels'
+import { Account } from './components/Account'
+import { useCloud } from './lib/cloud'
 import {
   IconBook,
   IconBookmark,
@@ -42,6 +44,7 @@ const TABS: { id: Tab; label: string; ar: string; icon: ReactNode }[] = [
 ]
 
 export default function App() {
+  const cloud = useCloud()
   const [tab, setTab] = useState<Tab>('course')
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null)
   const [lessonStep, setLessonStep] = useState<1 | 2 | 3 | 4>(1)
@@ -216,6 +219,7 @@ export default function App() {
       </header>
 
       <main className="main" id="main-content" tabIndex={-1}>
+        <Account />
         <Suspense fallback={<p role="status" className="muted">正在打开学习内容…</p>}>
         {tab === 'course' &&
           (sentenceJob ? (
@@ -481,7 +485,7 @@ export default function App() {
         </Suspense>
       </main>
       <footer className="footer muted">
-        Qalam قَلَم · 一点一滴，读懂另一种语言。学习记录保存在当前浏览器。
+        Qalam قَلَم · 一点一滴，读懂另一种语言。{cloud.user ? '已登录，学习记录将同步到云端。' : '游客记录保存在当前浏览器，登录后可导入云端。'}
       </footer>
     </div>
   )

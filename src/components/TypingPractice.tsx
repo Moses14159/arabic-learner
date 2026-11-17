@@ -5,6 +5,8 @@ import { charsFromEvent, KEY_FOR_CHAR, MARK_NAMES } from '../lib/keyboard'
 import { formatPronunciation, sfx, speak } from '../lib/audio'
 import type { SessionRecord, Settings } from '../lib/storage'
 import { sessionMetrics } from '../lib/session'
+import { recordAttempt } from '../lib/cloud'
+import { getWordExercise } from '../../shared/catalog'
 import { Keyboard } from './Keyboard'
 import { IconArrowLeft, IconArrowRight, IconRefresh, IconTrophy, IconVolume } from './Icons'
 
@@ -34,6 +36,9 @@ interface Game {
   assisted: boolean
   missed: Word[]
   locked: boolean
+  roundId: string
+  wordStartedAt: number
+  wordRecorded: boolean
 }
 
 const freshGame = (): Game => ({
@@ -51,6 +56,9 @@ const freshGame = (): Game => ({
   assisted: false,
   missed: [],
   locked: false,
+  roundId: crypto.randomUUID(),
+  wordStartedAt: 0,
+  wordRecorded: false,
 })
 
 const fmtTime = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`
@@ -113,12 +121,15 @@ export function TypingPractice({ title, words, settings, setSettings, onMistake,
       kind: 'typing',
       assisted: s.assisted,
       skipped: s.skipped,
+      roundId: s.roundId,
     })
   }
 
   const advance = () => {
     s.idx++
     s.wordHadError = false
+    s.wordStartedAt = 0
+    s.wordRecorded = false
     s.locked = false
     resetWord()
     if (s.idx >= list.length) finishSession()
@@ -144,9 +155,28 @@ export function TypingPractice({ title, words, settings, setSettings, onMistake,
     pressTimer.current = window.setTimeout(() => setPressed(null), 160)
   }
 
+  const recordWord = (skipped: boolean) => {
+    if (s.wordRecorded) return
+    s.wordRecorded = true
+    const exercise = getWordExercise(word)
+    if (!exercise) return
+    recordAttempt({
+      exerciseId: exercise.id,
+      contentVersion: exercise.version,
+      roundId: s.roundId,
+      mode: 'typing',
+      answer: skipped ? '' : word.ar,
+      assisted: s.assisted,
+      hadError: s.wordHadError,
+      durationMs: s.wordStartedAt ? Math.min(604_800_000, Math.max(0, Date.now() - s.wordStartedAt)) : 0,
+      skipped,
+    })
+  }
+
   const handleChars = (chars: string, code: string) => {
     if (s.locked || finished) return
     if (!s.start) s.start = Date.now()
+    if (!s.wordStartedAt) s.wordStartedAt = Date.now()
     for (const ch of chars) {
       if (ch === '\u0640') continue
       const cur = clusters[s.ci]
@@ -175,6 +205,7 @@ export function TypingPractice({ title, words, settings, setSettings, onMistake,
       if (s.ci >= clusters.length) {
         s.done++
         s.locked = true
+        recordWord(false)
         play('word')
         setFlash(true)
         showPress(code, true)
@@ -199,6 +230,7 @@ export function TypingPractice({ title, words, settings, setSettings, onMistake,
       s.missed.push(word)
       onMistake(word)
     }
+    recordWord(true)
     advance()
   }
 

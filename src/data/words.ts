@@ -1,4 +1,4 @@
-import { LETTERS } from './letters'
+import { LETTERS } from './letters.ts'
 
 export interface Word {
   ar: string

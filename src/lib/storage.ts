@@ -1,37 +1,31 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
+import type { Dispatch, SetStateAction } from 'react'
 import type { Word } from '../data/words'
+import { getScope, readStored, subscribeStore, writeStored } from './cloud-store'
 
-export function useStored<T>(key: string, fallback: T) {
-  const [value, setValue] = useState<T>(() => {
+function usePersistent<T>(key: string, fallback: T, list: boolean) {
+  const scope = getScope()
+  const [initial] = useState<T>(() => fallback)
+  const raw = useSyncExternalStore(subscribeStore, () => readStored(scope, key), () => null)
+  const parse = useCallback((value: string | null): T => {
     try {
-      const raw = localStorage.getItem(key)
-      return raw ? { ...fallback, ...JSON.parse(raw) } : fallback
-    } catch {
-      return fallback
-    }
-  })
-  useEffect(() => {
-    localStorage.setItem(key, JSON.stringify(value))
-  }, [key, value])
+      const parsed: unknown = value ? JSON.parse(value) : null
+      if (list) return (Array.isArray(parsed) ? parsed : initial) as T
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return { ...initial, ...parsed }
+      return initial
+    } catch { return initial }
+  }, [initial, list])
+  const value = useMemo(() => parse(raw), [parse, raw])
+  const setValue: Dispatch<SetStateAction<T>> = useCallback((update) => {
+    const previous = parse(readStored(scope, key))
+    const next = typeof update === 'function' ? (update as (previous: T) => T)(previous) : update
+    writeStored(scope, key, previous, next)
+  }, [key, parse, scope])
   return [value, setValue] as const
 }
 
-/** Same as useStored but for arrays (no object-spread merge). */
-export function useStoredList<T>(key: string) {
-  const [value, setValue] = useState<T[]>(() => {
-    try {
-      const raw = localStorage.getItem(key)
-      const parsed: unknown = raw ? JSON.parse(raw) : []
-      return Array.isArray(parsed) ? (parsed as T[]) : []
-    } catch {
-      return []
-    }
-  })
-  useEffect(() => {
-    localStorage.setItem(key, JSON.stringify(value))
-  }, [key, value])
-  return [value, setValue] as const
-}
+export function useStored<T>(key: string, fallback: T) { return usePersistent(key, fallback, false) }
+export function useStoredList<T>(key: string) { return usePersistent<T[]>(key, [], true) }
 
 export interface Settings {
   showMarks: boolean
@@ -62,6 +56,8 @@ export interface MistakeEntry extends Word {
 export type MistakeBook = Record<string, MistakeEntry>
 
 export interface SessionRecord {
+  roundId?: string
+  source?: 'legacy_import' | 'client_reported'
   at: number
   title: string
   words: number

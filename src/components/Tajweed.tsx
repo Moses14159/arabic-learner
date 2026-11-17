@@ -1,12 +1,17 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { TAJWEED_LESSONS, TAJWEED_SCOPE, TAJWEED_SOURCES } from '../data/tajweed'
 import { useStored } from '../lib/storage'
+import { recordAttempt } from '../lib/cloud'
+import { getTajweedExercise } from '../../shared/catalog'
 import { IconArrowLeft, IconArrowRight, IconBook, IconCheck } from './Icons'
 
 export function Tajweed({ onLetters }: { onLetters: () => void }) {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [answers, setAnswers] = useState<Record<number, number>>({})
   const [saved, setSaved] = useState(false)
+  const roundId = useRef('')
+  const openedAt = useRef(0)
+  const answered = useRef(new Set<number>())
   const [results, setResults] = useStored<Record<string, { score: number; at: number }>>('qalam.tajweed-checks.v1', {})
   const active = TAJWEED_LESSONS.find((lesson) => lesson.id === activeId)
   const reviewedCount = TAJWEED_LESSONS.filter((lesson) => results[lesson.id]).length
@@ -14,6 +19,27 @@ export function Tajweed({ onLetters }: { onLetters: () => void }) {
     setActiveId(id)
     setAnswers({})
     setSaved(false)
+    roundId.current = crypto.randomUUID()
+    openedAt.current = Date.now()
+    answered.current.clear()
+  }
+
+  const chooseAnswer = (index: number, optionIndex: number) => {
+    if (!active || answered.current.has(index)) return
+    answered.current.add(index)
+    setAnswers((previous) => ({ ...previous, [index]: optionIndex }))
+    const exercise = getTajweedExercise(active.id, active.quiz[index])
+    if (!exercise) return
+    recordAttempt({
+      exerciseId: exercise.id,
+      contentVersion: exercise.version,
+      roundId: roundId.current,
+      mode: 'tajweed',
+      answer: optionIndex,
+      assisted: false,
+      hadError: optionIndex !== active.quiz[index].correctIndex,
+      durationMs: Math.min(604_800_000, Math.max(0, Date.now() - openedAt.current)),
+    })
   }
 
   if (active) {
@@ -35,7 +61,7 @@ export function Tajweed({ onLetters }: { onLetters: () => void }) {
         {active.quiz.map((question, index) => <fieldset key={question.question}>
           <legend>{index + 1}. {question.question}</legend>
           <div className="tajweed-options">
-            {question.options.map((option, optionIndex) => <button key={option} className={'btn btn--ghost' + (answers[index] === optionIndex ? ' is-picked' : '')} disabled={answers[index] !== undefined} onClick={() => setAnswers((previous) => ({ ...previous, [index]: optionIndex }))}>
+            {question.options.map((option, optionIndex) => <button key={option} className={'btn btn--ghost' + (answers[index] === optionIndex ? ' is-picked' : '')} disabled={answers[index] !== undefined} onClick={() => chooseAnswer(index, optionIndex)}>
               <span>{option}</span>{answers[index] !== undefined && optionIndex === question.correctIndex && <IconCheck size={17} />}
             </button>)}
           </div>

@@ -6,6 +6,8 @@ import { charsFromEvent, KEY_FOR_CHAR, MARK_NAMES } from '../lib/keyboard'
 import { formatPronunciation, sfx, speak } from '../lib/audio'
 import type { SessionRecord, Settings } from '../lib/storage'
 import { sessionMetrics } from '../lib/session'
+import { recordAttempt } from '../lib/cloud'
+import { getSentenceExercise } from '../../shared/catalog'
 import { Keyboard } from './Keyboard'
 import {
   IconArrowLeft,
@@ -40,6 +42,9 @@ export function SentencePractice({ title, sentences, settings, setSettings, onCo
   const endedAt = useRef(0)
   const sentenceHadError = useRef(false)
   const completionSent = useRef(false)
+  const roundId = useRef(crypto.randomUUID())
+  const sentenceStartedAt = useRef(0)
+  const reportedSentences = useRef(new Set<number>())
 
   // ---- Build Mode (Word Tiles) State ----
   const [pickedIndices, setPickedIndices] = useState<number[]>([])
@@ -97,6 +102,23 @@ export function SentencePractice({ title, sentences, settings, setSettings, onCo
     setActiveTokenIdx(0)
   }
 
+  const recordSentence = (practiceMode: 'build' | 'type') => {
+    if (reportedSentences.current.has(idx)) return
+    reportedSentences.current.add(idx)
+    const exercise = getSentenceExercise(current)
+    if (!exercise) return
+    recordAttempt({
+      exerciseId: exercise.id,
+      contentVersion: exercise.version,
+      roundId: roundId.current,
+      mode: practiceMode === 'build' ? 'sentence-build' : 'sentence-type',
+      answer: current.ar,
+      assisted: assisted || practiceMode === 'type',
+      hadError: sentenceHadError.current,
+      durationMs: sentenceStartedAt.current ? Math.min(604_800_000, Math.max(0, Date.now() - sentenceStartedAt.current)) : 0,
+    })
+  }
+
   const nextSentence = () => {
     if (!solved || finished || completionSent.current) return
     clearTimeout(speechTimer.current)
@@ -115,11 +137,13 @@ export function SentencePractice({ title, sentences, settings, setSettings, onCo
         wpm: 0,
         kind: 'sentence',
         assisted,
+        roundId: roundId.current,
       })
     }
     setIdx(next)
     resetSentenceState()
     sentenceHadError.current = false
+    sentenceStartedAt.current = 0
     setXray(false)
   }
 
@@ -127,6 +151,7 @@ export function SentencePractice({ title, sentences, settings, setSettings, onCo
   const pickTile = (poolIdx: number) => {
     if (solved || finished || pickedIndices.includes(poolIdx)) return
     if (!startedAt.current) startedAt.current = Date.now()
+    if (!sentenceStartedAt.current) sentenceStartedAt.current = Date.now()
     const nextSlot = pickedIndices.length
     const expectedAr = current.tokens[nextSlot]?.ar
     const chosenAr = tilePool[poolIdx]
@@ -137,6 +162,7 @@ export function SentencePractice({ title, sentences, settings, setSettings, onCo
       setActiveTokenIdx(nextSlot)
       speak(chosenAr)
       if (nextPicked.length === current.tokens.length) {
+        recordSentence('build')
         play('word')
         setSolved(true)
         speechTimer.current = window.setTimeout(() => speak(current.ar), 250)
@@ -163,6 +189,7 @@ export function SentencePractice({ title, sentences, settings, setSettings, onCo
   const handleKeyStream = (chars: string, code: string) => {
     if (solved || finished) return
     if (!startedAt.current) startedAt.current = Date.now()
+    if (!sentenceStartedAt.current) sentenceStartedAt.current = Date.now()
     let curCi = ci
     let curBaseDone = baseDone
     let curMarks = [...marksLeft]
@@ -204,6 +231,7 @@ export function SentencePractice({ title, sentences, settings, setSettings, onCo
       }
 
       if (curCi >= clusters.length) {
+        recordSentence('type')
         setCi(curCi)
         setBaseDone(false)
         setMarksLeft([])
@@ -299,6 +327,9 @@ export function SentencePractice({ title, sentences, settings, setSettings, onCo
                 endedAt.current = 0
                 sentenceHadError.current = false
                 completionSent.current = false
+                roundId.current = crypto.randomUUID()
+                sentenceStartedAt.current = 0
+                reportedSentences.current.clear()
                 setAssisted(mode === 'type')
                 setXray(false)
                 resetSentenceState()

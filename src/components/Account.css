@@ -1,0 +1,23 @@
+.account-panel { border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); min-width: 0; width: 100%; }
+.account-summary { list-style: none; cursor: pointer; padding: 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; min-height: 52px; }
+.account-summary::-webkit-details-marker { display: none; }
+.account-summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 12px; }
+.account-summary > span:first-child { display: grid; gap: 5px; min-width: 0; }
+.account-summary b { font-size: 14px; }
+.account-summary small { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.account-status { font-size: 11px; color: var(--accent); background: var(--accent-soft); padding: 4px 7px; border-radius: 6px; white-space: nowrap; }
+.account-status--error { color: var(--text); border: 1px solid var(--border-hi); }
+.account-body { padding: 0 14px 14px; border-top: 1px solid var(--border); font-size: 14px; overflow-wrap: anywhere; }
+.account-body p { line-height: 1.65; margin: 12px 0; }
+.account-body .btn { min-height: 44px; white-space: normal; }
+.account-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.account-form { display: grid; gap: 10px; }
+.account-form label { font-size: 13px; font-weight: 600; }
+.account-form input { border: 1px solid var(--border-hi); border-radius: 9px; padding: 11px; min-width: 0; width: 100%; background: var(--surface-inset); color: var(--text); font: inherit; font-size: 16px; box-sizing: border-box; }
+.account-form input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.account-form input:disabled { opacity: .7; }
+.account-error { border-inline-start: 3px solid var(--border-hi); background: var(--surface-inset); border-radius: 6px; padding: 10px; }
+.account-notice { color: var(--accent); }
+.account-import { border-top: 1px solid var(--border); padding-top: 14px; margin-top: 16px; }
+.account-last-sync { display: block; margin-top: 5px; }
+@media (prefers-reduced-motion: reduce) { .account-panel * { transition: none; } }

@@ -8,13 +8,15 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "node scripts/check-session.mjs && node tests/grammar-content.test.mjs && node tests/learning-path.test.mjs && node tests/tajweed-content.test.mjs"
+    "test": "node scripts/check-session.mjs && node tests/grammar-content.test.mjs && node tests/learning-path.test.mjs && node tests/tajweed-content.test.mjs && node tests/cloud-content.test.mjs && node tests/cloud-sync.test.mjs && node tests/cloud-api.test.mjs && node tests/cloud-database.test.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.119.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.16",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

@@ -1,6 +1,7 @@
 import type { Word } from '../data/words'
 import type { MistakeBook, SessionRecord } from '../lib/storage'
 import { speak } from '../lib/audio'
+import { useCloud } from '../lib/cloud'
 import { IconCheck, IconFlame, IconKeyboard } from './Icons'
 
 export function Mistakes({
@@ -88,6 +89,7 @@ function streakDays(sessions: SessionRecord[]) {
 }
 
 export function Stats({ sessions, onClear }: { sessions: SessionRecord[]; onClear: () => void }) {
+  const { user } = useCloud()
   // Legacy sentence records used fixed durations and speeds; retain them only in history.
   const measured = sessions.filter((s) => s.kind === 'typing' || s.kind === 'sentence')
   const totalWords = measured.reduce((a, s) => a + s.words, 0)
@@ -113,11 +115,11 @@ export function Stats({ sessions, onClear }: { sessions: SessionRecord[]; onClea
       <div className="panel__head">
         <div>
           <h2>学习统计</h2>
-          <p className="muted">数据只保存在本机浏览器里。词次包含重复练习；练习成绩不等于长期掌握。</p>
+          <p className="muted">词次包含重复练习；练习成绩不等于长期掌握。已登录时可同步记录，游客记录保存在当前浏览器。</p>
         </div>
         {sessions.length > 0 && (
-          <button id="btn-clear-stats" className="btn btn--ghost" onClick={() => confirm('清空所有记录？') && onClear()}>
-            清空记录
+          <button id="btn-clear-stats" className="btn btn--ghost" onClick={() => confirm(user ? '重置统计展示？此操作会同步到其他设备，云端原始学习日志仍保留。' : '清空当前浏览器的练习统计记录？') && onClear()}>
+            {user ? '重置统计展示' : '清空记录'}
           </button>
         )}
       </div>
@@ -185,9 +187,9 @@ export function Stats({ sessions, onClear }: { sessions: SessionRecord[]; onClea
             </thead>
             <tbody>
               {[...sessions].reverse().slice(0, 15).map((s) => (
-                <tr key={s.at}>
+                <tr key={s.roundId ?? `${s.at}-${s.title}`}>
                   <td>{new Date(s.at).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
-                  <td>{s.title}<small className="muted" style={{ display: 'block' }}>{s.kind === 'sentence' ? s.assisted ? '辅助造句' : '独立造句' : s.kind === 'typing' ? '词库打字' : '旧版记录'}</small></td>
+                  <td>{s.title}<small className="muted" style={{ display: 'block' }}>{s.kind === 'sentence' ? s.assisted ? '辅助造句' : '未看答案造句' : s.kind === 'typing' ? '词库打字' : '旧版记录'}{s.source === 'legacy_import' ? ' · 历史导入' : ''}</small></td>
                   <td>{s.words}</td>
                   <td>
                     {Math.floor(s.seconds / 60)}′{s.seconds % 60}″
